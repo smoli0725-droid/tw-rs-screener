@@ -1,0 +1,34 @@
+name: Daily Taiwan RS Update
+
+on:
+  schedule:
+    # 週一到週五 18:30 台北時間(10:30 UTC),收盤資料已完整
+    - cron: "30 10 * * 1-5"
+  workflow_dispatch: {}   # 也可以隨時手動觸發
+
+permissions:
+  contents: write
+
+jobs:
+  rs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run RS calculator
+        run: python rs_calculator.py
+
+      - name: Commit results
+        run: |
+          git config user.name "rs-bot"
+          git config user.email "rs-bot@users.noreply.github.com"
+          git add output/
+          git commit -m "RS update $(date +%F)" || echo "no changes"
+          git push
