@@ -29,7 +29,7 @@ jobs:
         run: |
           git config user.name "rs-bot"
           git config user.email "rs-bot@users.noreply.github.com"
-          git pull --rebase
           git add output/
           git commit -m "RS update $(date +%F)" || echo "no changes"
+          git pull --rebase
           git push
