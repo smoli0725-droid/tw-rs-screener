@@ -163,7 +163,7 @@ def compute_template(close: pd.DataFrame, volume: pd.DataFrame,
 
 
 # ---------------------------------------------------------------- 輸出
-def export(result, template, universe, outdir="output"):
+def export(result, template, universe, data_date, outdir="output"):
     import os
     os.makedirs(outdir, exist_ok=True)
     meta = universe.set_index("yf_ticker")
@@ -192,7 +192,9 @@ def export(result, template, universe, outdir="output"):
         for ws in w.sheets.values():
             for col, width in zip("ABCDEFGHIJKLMNOP", widths):
                 ws.column_dimensions[col].width = width
-    print(f"[{today}] 排名 {len(result)} 檔|RS≥85:{len(top)} 檔|"
+    with open(f"{outdir}/資料日期.txt", "w") as f:
+        f.write(f"價格資料最後交易日:{data_date}\n執行日期:{today}\n")
+    print(f"[{today}] 資料日期:{data_date}|排名 {len(result)} 檔|RS≥85:{len(top)} 檔|"
           f"通過趨勢樣板(含均量≥{MIN_AVG_VOL_ZHANG}張):{len(passed)} 檔")
     return result
 
@@ -233,7 +235,7 @@ def main():
 
     result = compute_rs(close)
     template = compute_template(close[result.index.tolist()], volume, twii, result["RS"])
-    export(result, template, uni)
+    export(result, template, uni, data_date=close.index[-1].date())
 
 
 if __name__ == "__main__":
