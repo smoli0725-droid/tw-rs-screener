@@ -183,6 +183,13 @@ def export(result, template, universe, data_date, outdir="output"):
     today = dt.date.today().isoformat()
 
     passed.to_csv(f"{outdir}/趨勢樣板通過.csv", index=False, encoding="utf-8-sig")
+
+    # TradingView 觀察清單:上市=TWSE、上櫃=TPEX,逗號分隔
+    tv_prefix = passed["市場"].map({"上市": "TWSE", "上櫃": "TPEX"})
+    tv_symbols = (tv_prefix + ":" + passed["代號"].astype(str)).dropna().tolist()
+    with open(f"{outdir}/TradingView觀察清單.txt", "w", encoding="utf-8") as f:
+        f.write(",".join(tv_symbols))
+
     top.to_csv(f"{outdir}/RS_85-100.csv", index=False, encoding="utf-8-sig")
     with pd.ExcelWriter(f"{outdir}/RS_全市場排名.xlsx", engine="openpyxl") as w:
         passed.to_excel(w, sheet_name="趨勢樣板通過", index=False)
