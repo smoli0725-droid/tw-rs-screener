@@ -10,10 +10,8 @@ score = 2×(3個月報酬) + (6個月) + (9個月) + (12個月)
 - 排除 ETF / ETN / DR / 受益證券;上市未滿一年者以可得期間加權
 
 ## 每日自動更新
-預設每個交易日 18:30(台北時間)自動執行,結果直接 commit 回 repo 的
-  `output/` 資料夾,手機開 GitHub 網頁版去 output 就能下載最新 CSV 及 txt檔
-由於 Github 免費版常有延遲執行情形,手動跑: Actions 頁面 → Daily Taiwan RS Update → **Run workflow** 
-
+- 預設每個交易日 18:30(台北時間)自動執行,結果直接 commit 回 repo 的  `output/` 資料夾,手機開 GitHub 網頁版去 output 就能下載最新 CSV 及 txt檔
+- 由於 Github 免費版常有延遲執行情形,手動跑: Actions 頁面 → Daily Taiwan RS Update → **Run workflow** 
 
 ## 已知限制
 - Yahoo Finance 偶爾漏個別上櫃股或暫時限流;workflow 失敗時隔天會自動再跑,
