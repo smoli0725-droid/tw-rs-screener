@@ -2,8 +2,11 @@ name: Daily Taiwan RS Update
 
 on:
   schedule:
-    # 週一到週五 18:30 台北時間(10:30 UTC),收盤資料已完整
+    # 台北 17:00 / 18:30 / 20:00（UTC 09:00 / 10:30 / 12:00）,週一到週五
+    # 17:00 主跑;若 Yahoo 資料尚未更新則失敗,由後續備援時段重試
+    - cron: "0 9 * * 1-5"
     - cron: "30 10 * * 1-5"
+    - cron: "0 12 * * 1-5"
   workflow_dispatch: {}   # 也可以隨時手動觸發
 
 permissions:
@@ -22,14 +25,33 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run RS calculator
+      - name: Skip if already fresh today
+        id: skip
+        run: |
+          TODAY=$(TZ=Asia/Taipei date +%F)
+          if [ -f output/資料日期.txt ]; then
+            DATA_DATE=$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' output/資料日期.txt | head -1)
+            echo "repo_data_date=$DATA_DATE today=$TODAY"
+            if [ "$DATA_DATE" = "$TODAY" ]; then
+              echo "Already updated for $TODAY — skipping."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run RS calculator + pattern screener
+        if: steps.skip.outputs.skip != 'true'
         run: python rs_calculator.py
 
       - name: Commit results
+        if: steps.skip.outputs.skip != 'true'
         run: |
           git config user.name "rs-bot"
           git config user.email "rs-bot@users.noreply.github.com"
           git add output/
-          git commit -m "RS update $(date +%F)" || echo "no changes"
+          git commit -m "RS update $(TZ=Asia/Taipei date +%F)" || echo "no changes"
           git pull --rebase
           git push

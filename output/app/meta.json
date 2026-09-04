@@ -1,0 +1,17 @@
+{
+  "data_date": null,
+  "generated_at": null,
+  "is_fresh": false,
+  "is_trading_day": null,
+  "source_checked_at": null,
+  "message": "placeholder — awaiting first workflow run after merge",
+  "twse_cross_check": null,
+  "counts": {
+    "rs85": 0,
+    "patterns": 0,
+    "near_breakout": 0,
+    "broke_out": 0,
+    "ohlcv_symbols": 0,
+    "universe": 0
+  }
+}
