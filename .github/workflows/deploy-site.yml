@@ -11,21 +11,26 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: web-deploy
   cancel-in-progress: true
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check Cloudflare secrets
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "::error::缺少 Cloudflare secrets。請到 repo Settings → Secrets and variables → Actions 新增："
+            echo "  1) CLOUDFLARE_API_TOKEN"
+            echo "  2) CLOUDFLARE_ACCOUNT_ID"
+            echo "設定步驟見 README「網站版」章節。"
+            exit 1
+          fi
 
       - name: Bundle daily JSON into site/data
         run: |
@@ -38,17 +43,14 @@ jobs:
             echo '[]' > site/data/rs85.json
             echo '[]' > site/data/patterns.json
           fi
+          # Cloudflare 不需要 .nojekyll，但留著無妨
           touch site/.nojekyll
           ls -la site/data | head
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
         with:
-          path: site
-
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # 第一次會自動建立專案；之後同一名稱即更新
+          command: pages deploy site --project-name=tw-rs-screener --commit-dirty=true
