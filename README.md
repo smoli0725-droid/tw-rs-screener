@@ -70,11 +70,13 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
 ### 第一次設定（約 5 分鐘）
 
 1. 註冊免費帳號：https://dash.cloudflare.com/sign-up
-2. 左側 **Workers & Pages** 看得到即可（專案會由 Actions 自動建立）
+2. **先建立空專案**（名稱必須完全一致）：  
+   Cloudflare → **Workers & Pages** → **Create** → **Pages** → **Upload assets** / Direct Upload  
+   → Project name 填 `tw-rs-screener` → Create（不必真的上傳檔案）
 3. 建立 API Token：  
    https://dash.cloudflare.com/profile/api-tokens  
    → **Create Token** → 使用範本 **Edit Cloudflare Workers**  
-   （或自訂權限包含 Account / Cloudflare Pages / Edit）
+   （權限需含 Account / Cloudflare Pages / Edit；Account Resources 選你的帳號）
 4. 複製 **Account ID**：Dashboard 右側 Overview 可看到
 5. 回到 GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**，新增兩個：
    - `CLOUDFLARE_API_TOKEN` = 剛才的 token
@@ -82,6 +84,8 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
 6. **Actions → Deploy Web Site → Run workflow**
 7. 跑完後到 Cloudflare → Workers & Pages → **tw-rs-screener** → 會看到網址  
    （形如 `https://tw-rs-screener.pages.dev`）
+
+> 若 Actions 出現 `Project not found [code: 8000007]`，就是還沒建立名為 `tw-rs-screener` 的 Pages 專案。
 
 之後每日 RS Actions 更新 `output/app/`，或你改 `site/`，都會自動重新部署。
 
