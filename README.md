@@ -13,6 +13,7 @@ score = 2×(3個月報酬) + (6個月) + (9個月) + (12個月)
 ## 趨勢樣板與型態篩選
 - 趨勢樣板通過名單仍輸出至 `output/趨勢樣板通過.csv`
 - 六種型態偵測(`pattern_screener.py`):VCP、3-C 作弊、低位作弊、杯狀帶柄、雙重底、高聳旗形
+- **型態掃描池 = RS≥85 且通過趨勢樣板**(不再掃未過樣板的 RS 強勢股)
 - App JSON 輸出至 `output/app/`:`meta.json`、`rs85.json`、`patterns.json`、`ohlcv/{代號}.json`
 
 ## 每日自動更新(含資料新鮮度保護)

@@ -230,7 +230,7 @@ def test_full_pipeline_test_mode(tmp_path, monkeypatch):
                   outdir=str(tmp_path / "output"))
     assert (tmp_path / "output" / "RS_85-100.csv").exists()
 
-    patterns = screen_patterns(ohlcv, full, min_rs=1)  # 放寬以確保有掃描
+    patterns = screen_patterns(ohlcv, full, min_rs=1, require_template=False)  # 測試放寬
     freshness = {
         "data_date": close.index[-1].date().isoformat(),
         "is_fresh": True,
