@@ -1,0 +1,54 @@
+name: Deploy Web Site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "output/app/**"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bundle daily JSON into site/data
+        run: |
+          rm -rf site/data
+          mkdir -p site/data
+          if [ -d output/app ]; then
+            cp -a output/app/. site/data/
+          else
+            echo '{"data_date":null,"is_fresh":false,"message":"no output/app yet","counts":{}}' > site/data/meta.json
+            echo '[]' > site/data/rs85.json
+            echo '[]' > site/data/patterns.json
+          fi
+          touch site/.nojekyll
+          ls -la site/data | head
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

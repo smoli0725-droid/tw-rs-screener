@@ -1,0 +1,112 @@
+window.RS_PORTFOLIO = (() => {
+  function buildPositions(trades, priceMap = {}) {
+    const lots = {};
+    const sorted = [...trades].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    for (const t of sorted) {
+      const sym = String(t.symbol);
+      const lot = (lots[sym] ??= {
+        symbol: sym,
+        name: t.name || sym,
+        market: t.market || '上市',
+        shares: 0,
+        cost: 0,
+      });
+      const shares = Number(t.shares);
+      const price = Number(t.price);
+      if ((t.side || 'buy') === 'buy') {
+        const next = lot.shares + shares;
+        lot.cost = next > 0 ? (lot.cost * lot.shares + price * shares) / next : 0;
+        lot.shares = next;
+        lot.name = t.name || lot.name;
+        lot.market = t.market || lot.market;
+      } else {
+        lot.shares = Math.max(0, lot.shares - shares);
+        if (!lot.shares) lot.cost = 0;
+      }
+    }
+    return Object.values(lots)
+      .filter((p) => p.shares > 0)
+      .map((p) => {
+        const lastPrice = priceMap[p.symbol];
+        const px = lastPrice != null ? lastPrice : p.cost;
+        const marketValue = px * p.shares;
+        const costValue = p.cost * p.shares;
+        return {
+          ...p,
+          lastPrice,
+          marketValue,
+          costValue,
+          pnl: marketValue - costValue,
+          returnPct: p.cost ? px / p.cost - 1 : 0,
+        };
+      })
+      .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  }
+
+  function computeMetrics(trades, positions) {
+    const sorted = [...trades].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const buys = {};
+    const closed = [];
+    for (const t of sorted) {
+      const sym = String(t.symbol);
+      if ((t.side || 'buy') === 'buy') {
+        (buys[sym] ??= []).push({ shares: Number(t.shares), price: Number(t.price), date: t.date });
+      } else {
+        let remain = Number(t.shares);
+        const q = buys[sym] || [];
+        while (remain > 0 && q.length) {
+          const lot = q[0];
+          const matched = Math.min(remain, lot.shares);
+          closed.push({
+            sellDate: t.date,
+            returnPct: lot.price ? Number(t.price) / lot.price - 1 : 0,
+            pnl: (Number(t.price) - lot.price) * matched,
+          });
+          lot.shares -= matched;
+          remain -= matched;
+          if (lot.shares <= 0) q.shift();
+        }
+      }
+    }
+
+    let winRate = null;
+    let avgReturnPct = null;
+    if (closed.length) {
+      winRate = closed.filter((c) => c.pnl > 0).length / closed.length;
+      avgReturnPct = closed.reduce((s, c) => s + c.returnPct, 0) / closed.length;
+    } else if (positions.length) {
+      winRate = positions.filter((p) => p.pnl > 0).length / positions.length;
+    }
+
+    const avgOpenReturnPct = positions.length
+      ? positions.reduce((s, p) => s + p.returnPct, 0) / positions.length
+      : null;
+
+    const monthlyMap = {};
+    for (const c of closed) {
+      const key = String(c.sellDate).slice(0, 7);
+      monthlyMap[key] = (monthlyMap[key] || 0) + c.pnl;
+    }
+    const nowKey = new Date().toISOString().slice(0, 7);
+    for (const p of positions) monthlyMap[nowKey] = (monthlyMap[nowKey] || 0) + p.pnl;
+    const costBase = positions.reduce((s, p) => s + p.costValue, 0) || 1;
+    const monthly = Object.keys(monthlyMap)
+      .sort()
+      .map((yearMonth) => ({
+        yearMonth,
+        pnl: monthlyMap[yearMonth],
+        returnPct: monthlyMap[yearMonth] / costBase,
+      }));
+
+    return {
+      winRate,
+      avgReturnPct,
+      avgOpenReturnPct,
+      closedCount: closed.length,
+      openCount: positions.length,
+      monthly,
+    };
+  }
+
+  return { buildPositions, computeMetrics };
+})();
