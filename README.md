@@ -58,20 +58,32 @@ https://raw.githubusercontent.com/smoli0725-droid/tw-rs-screener/main/output/app
 
 ## 網站版（`site/`，給 iPhone / 任何瀏覽器）
 
-不需安裝 App。部署到 **GitHub Pages** 後，用 Safari 打開即可；可「加入主畫面」。
+不需安裝 App。部署到 **Cloudflare Pages（免費）** 後，用 Safari 打開即可；可「加入主畫面」。  
+Private repo 也能用（不必把 GitHub 改成 Public）。
 
 功能對應 App：
 - 持股（存在瀏覽器 localStorage）
-- RS≥85 總表、型態／即將突破（讀 `output/app` JSON）
-- K 線（讀 `ohlcv/{代號}.json`）
+- RS≥85 總表、型態／即將突破
+- K 線
 - 設定資料來源（預設 `./data`）
 
-### 啟用 GitHub Pages
-1. Repo **Settings → Pages** → Source 選 **GitHub Actions**
-2. Actions → **Deploy Web Site** → **Run workflow**（之後更新 `site/` 或 `output/app/` 會自動部署）
-3. 網址通常為：`https://<user>.github.io/<repo>/`
+### 第一次設定（約 5 分鐘）
 
-部署 workflow 會把 `output/app` 複製成網站的 `./data`，**private repo 也能讀到資料**（不必靠 raw.githubusercontent.com）。
+1. 註冊免費帳號：https://dash.cloudflare.com/sign-up
+2. 左側 **Workers & Pages** 看得到即可（專案會由 Actions 自動建立）
+3. 建立 API Token：  
+   https://dash.cloudflare.com/profile/api-tokens  
+   → **Create Token** → 使用範本 **Edit Cloudflare Workers**  
+   （或自訂權限包含 Account / Cloudflare Pages / Edit）
+4. 複製 **Account ID**：Dashboard 右側 Overview 可看到
+5. 回到 GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**，新增兩個：
+   - `CLOUDFLARE_API_TOKEN` = 剛才的 token
+   - `CLOUDFLARE_ACCOUNT_ID` = Account ID
+6. **Actions → Deploy Web Site → Run workflow**
+7. 跑完後到 Cloudflare → Workers & Pages → **tw-rs-screener** → 會看到網址  
+   （形如 `https://tw-rs-screener.pages.dev`）
+
+之後每日 RS Actions 更新 `output/app/`，或你改 `site/`，都會自動重新部署。
 
 本地預覽：
 
