@@ -1,17 +1,17 @@
 {
   "data_date": "2026-09-04",
-  "generated_at": "2026-09-05T11:30:30.910459+08:00",
+  "generated_at": "2026-09-05T15:46:40.158310+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-09-05T10:47:58.123594+08:00",
+  "source_checked_at": "2026-09-05T15:27:56.298150+08:00",
   "message": "週末,沿用 2026-09-04",
   "twse_cross_check": null,
   "counts": {
     "rs85": 291,
-    "patterns": 541,
-    "near_breakout": 77,
-    "broke_out": 146,
-    "ohlcv_symbols": 265,
+    "patterns": 232,
+    "near_breakout": 40,
+    "broke_out": 77,
+    "ohlcv_symbols": 111,
     "universe": 1961
   }
 }
