@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0b3d4a" />
+  <title>台股 RS 選股</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="manifest" href="manifest.json" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">RS</div>
+      <div>
+        <div class="brand-title">台股 RS 選股</div>
+        <div id="metaLine" class="meta-line">載入資料中…</div>
+      </div>
+    </div>
+    <button id="refreshBtn" class="ghost-btn" type="button">↻</button>
+  </header>
+
+  <main>
+    <section id="view-portfolio" class="view active">
+      <div class="card summary">
+        <div class="summary-label">總市值</div>
+        <div id="totalMv" class="summary-value">—</div>
+        <div id="totalPnl" class="summary-sub">損益 —</div>
+      </div>
+      <div class="row-actions">
+        <button id="addTradeBtn" class="primary-btn" type="button">＋ 新增持股</button>
+        <button id="metricsBtn" class="ghost-btn" type="button">績效</button>
+      </div>
+      <div id="positionList" class="list"></div>
+      <p class="hint">持股存在瀏覽器 localStorage。iPhone 請用 Safari「加入主畫面」以免資料分散。</p>
+    </section>
+
+    <section id="view-recommend" class="view">
+      <div class="tabs">
+        <button class="tab active" data-sub="rs85" type="button">RS≥85</button>
+        <button class="tab" data-sub="patterns" type="button">型態／即將突破</button>
+      </div>
+
+      <div id="sub-rs85" class="subview active">
+        <div class="filters">
+          <input id="rsSearch" type="search" placeholder="搜尋代號／名稱／產業" />
+          <div class="chips">
+            <button class="chip active" data-market="" type="button">全部</button>
+            <button class="chip" data-market="上市" type="button">上市</button>
+            <button class="chip" data-market="上櫃" type="button">上櫃</button>
+            <button id="tplOnlyChip" class="chip" type="button">只看通過樣板</button>
+          </div>
+        </div>
+        <div id="rs85List" class="list"></div>
+      </div>
+
+      <div id="sub-patterns" class="subview">
+        <div class="filters">
+          <div id="statusChips" class="chips">
+            <button class="chip active" data-status="即將突破" type="button">即將突破</button>
+            <button class="chip" data-status="已突破" type="button">已突破</button>
+            <button class="chip" data-status="整理中" type="button">整理中</button>
+          </div>
+          <div id="patternChips" class="chips wrap"></div>
+        </div>
+        <div id="patternCount" class="count-line"></div>
+        <div id="patternList" class="list"></div>
+      </div>
+    </section>
+
+    <section id="view-settings" class="view">
+      <div class="card form-card">
+        <label for="dataBaseUrl">資料來源 URL</label>
+        <textarea id="dataBaseUrl" rows="3" spellcheck="false"></textarea>
+        <p class="hint">預設 <code>./data</code>（隨網站一起部署的每日 JSON）。若你改成公開 raw 網址也可以。</p>
+        <button id="saveSettingsBtn" class="primary-btn" type="button">儲存並重新載入</button>
+      </div>
+      <div class="card">
+        <h3>iPhone 使用方式</h3>
+        <ol class="steps">
+          <li>用 Safari 打開此網站</li>
+          <li>分享 →「加入主畫面」</li>
+          <li>之後從桌面圖示開啟</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-view="portfolio" type="button"><span class="nav-icon">▣</span>持股</button>
+    <button class="nav-item" data-view="recommend" type="button"><span class="nav-icon">◈</span>推薦</button>
+    <button class="nav-item" data-view="settings" type="button"><span class="nav-icon">⚙</span>設定</button>
+  </nav>
+
+  <dialog id="tradeDialog">
+    <form method="dialog" id="tradeForm" class="dialog-body">
+      <h2>新增持股</h2>
+      <label>代號<input name="id" required pattern="[0-9]{4}" placeholder="2330" /></label>
+      <label>名稱<input name="name" placeholder="可留空，自動帶入" /></label>
+      <label>市場
+        <select name="market">
+          <option>上市</option>
+          <option>上櫃</option>
+        </select>
+      </label>
+      <label>成本價<input name="price" type="number" step="any" required /></label>
+      <label>股數<input name="shares" type="number" min="1" required /></label>
+      <label>日期<input name="date" type="date" required /></label>
+      <div class="dialog-actions">
+        <button value="cancel" class="ghost-btn" type="submit">取消</button>
+        <button value="save" class="primary-btn" type="submit">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="metricsDialog">
+    <div class="dialog-body">
+      <h2>績效統計</h2>
+      <div id="metricsBody"></div>
+      <div class="dialog-actions">
+        <button id="closeMetricsBtn" class="primary-btn" type="button">關閉</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="chartDialog" class="chart-dialog">
+    <div class="dialog-body chart-body">
+      <div class="chart-head">
+        <div>
+          <h2 id="chartTitle">—</h2>
+          <div id="chartSub" class="meta-line"></div>
+        </div>
+        <button id="closeChartBtn" class="ghost-btn" type="button">關閉</button>
+      </div>
+      <canvas id="chartCanvas"></canvas>
+      <div id="chartLegend" class="chart-legend"></div>
+      <button id="addFromChartBtn" class="primary-btn" type="button">加入持股</button>
+    </div>
+  </dialog>
+
+  <script src="js/config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/portfolio.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

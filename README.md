@@ -56,6 +56,30 @@ https://raw.githubusercontent.com/smoli0725-droid/tw-rs-screener/main/output/app
 
 若 fork 到其他 repo,到 App「設定」改 raw URL。
 
+## 網站版（`site/`，給 iPhone / 任何瀏覽器）
+
+不需安裝 App。部署到 **GitHub Pages** 後，用 Safari 打開即可；可「加入主畫面」。
+
+功能對應 App：
+- 持股（存在瀏覽器 localStorage）
+- RS≥85 總表、型態／即將突破（讀 `output/app` JSON）
+- K 線（讀 `ohlcv/{代號}.json`）
+- 設定資料來源（預設 `./data`）
+
+### 啟用 GitHub Pages
+1. Repo **Settings → Pages** → Source 選 **GitHub Actions**
+2. Actions → **Deploy Web Site** → **Run workflow**（之後更新 `site/` 或 `output/app/` 會自動部署）
+3. 網址通常為：`https://<user>.github.io/<repo>/`
+
+部署 workflow 會把 `output/app` 複製成網站的 `./data`，**private repo 也能讀到資料**（不必靠 raw.githubusercontent.com）。
+
+本地預覽：
+
+```bash
+cp -r output/app site/data
+cd site && python3 -m http.server 8080
+```
+
 ### 背景更新說明
 - Android:`android_alarm_manager_plus` 每日約 17:00 背景刷新持股價並推播損益;若推薦資料仍舊會約 45 分鐘後重試。另會排程本地通知提醒。
 - iOS:背景執行時機由系統決定,不保證準點;會排程本地通知,開啟 App 仍會立即刷新。

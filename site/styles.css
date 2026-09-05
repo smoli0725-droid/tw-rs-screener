@@ -1,0 +1,141 @@
+:root {
+  --ink: #0b3d4a;
+  --paper: #f3f7f5;
+  --card: #fff;
+  --line: #d5e0dc;
+  --accent: #0f7a6c;
+  --accent-soft: #d8f0eb;
+  --up: #c62828;
+  --down: #2e7d32;
+  --warn: #b86e00;
+  --muted: #5f7370;
+  --shadow: 0 8px 28px rgba(11, 61, 74, 0.08);
+  --radius: 16px;
+  --nav-h: 64px;
+  font-family: "DM Sans", "Noto Sans TC", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background:
+    radial-gradient(1100px 420px at 8% -8%, #cfe8e2 0%, transparent 55%),
+    radial-gradient(900px 380px at 100% 0%, #dce7f2 0%, transparent 50%),
+    var(--paper);
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 12px);
+}
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 14px 16px;
+  backdrop-filter: blur(10px);
+  background: rgba(243, 247, 245, 0.92);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; gap: 12px; align-items: center; }
+.brand-mark {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: grid; place-items: center; font-weight: 700; color: #fff;
+  background: linear-gradient(145deg, var(--ink), var(--accent));
+}
+.brand-title { font-weight: 700; }
+.meta-line, .count-line, .hint, .item-sub { color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
+main { max-width: 880px; margin: 0 auto; padding: 14px 16px 20px; }
+.view { display: none; }
+.view.active { display: block; }
+.subview { display: none; }
+.subview.active { display: block; }
+.card, .item {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.card { padding: 16px; margin-bottom: 12px; }
+.summary-label { color: var(--muted); font-size: 0.85rem; }
+.summary-value { font-size: 1.85rem; font-weight: 700; margin: 4px 0; }
+.summary-sub { font-weight: 600; }
+.pnl-up { color: var(--up); }
+.pnl-down { color: var(--down); }
+.row-actions, .dialog-actions { display: flex; gap: 8px; margin: 8px 0 12px; }
+.dialog-actions { justify-content: flex-end; margin-bottom: 0; }
+.primary-btn, .ghost-btn {
+  border: 0; border-radius: 999px; padding: 10px 16px;
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+.primary-btn { background: var(--ink); color: #fff; }
+.ghost-btn { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+.list { display: flex; flex-direction: column; gap: 8px; }
+.item {
+  padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 8px; cursor: pointer;
+}
+.item-title { font-weight: 700; }
+.item-right { text-align: right; }
+.badge {
+  display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 600; background: var(--accent-soft); color: var(--accent);
+}
+.badge.hot { background: #fde8e8; color: var(--up); }
+.badge.ok { background: #e7f6ea; color: var(--down); }
+.badge.warn { background: #fff1d6; color: var(--warn); }
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.tab {
+  flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 12px;
+  padding: 10px; font: inherit; font-weight: 600; cursor: pointer;
+}
+.tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+.filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.filters input, .form-card textarea, .dialog-body input, .dialog-body select {
+  width: 100%; border: 1px solid var(--line); border-radius: 12px;
+  padding: 11px 12px; font: inherit; background: #fff;
+}
+.chips { display: flex; gap: 6px; overflow-x: auto; }
+.chips.wrap { flex-wrap: wrap; overflow: visible; }
+.chip {
+  border: 1px solid var(--line); background: #fff; border-radius: 999px;
+  padding: 7px 12px; font: inherit; font-size: 0.85rem; white-space: nowrap; cursor: pointer;
+}
+.chip.active { background: var(--accent-soft); border-color: #9fd0c5; color: var(--accent); font-weight: 700; }
+.hint code { background: #e8efec; padding: 1px 6px; border-radius: 6px; }
+.steps { margin: 8px 0 0; padding-left: 1.15rem; color: var(--muted); line-height: 1.7; }
+.form-card label { display: block; font-weight: 600; margin-bottom: 6px; }
+.form-card textarea { margin-bottom: 8px; resize: vertical; }
+.empty {
+  text-align: center; color: var(--muted); padding: 32px 12px;
+  border: 1px dashed var(--line); border-radius: 14px;
+}
+.bottom-nav {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  background: rgba(255,255,255,0.95); border-top: 1px solid var(--line); z-index: 30;
+}
+.nav-item {
+  border: 0; background: transparent; color: var(--muted);
+  font: inherit; font-size: 0.8rem; font-weight: 600;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.nav-item.active { color: var(--ink); }
+.nav-icon { font-size: 1.05rem; }
+dialog {
+  border: 0; border-radius: 18px; padding: 0;
+  width: min(520px, calc(100vw - 24px));
+  box-shadow: 0 20px 60px rgba(0,0,0,.22);
+}
+dialog::backdrop { background: rgba(8, 30, 36, 0.45); }
+.dialog-body { padding: 18px; }
+.dialog-body h2 { margin: 0 0 12px; font-size: 1.15rem; }
+.dialog-body label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 0.85rem; font-weight: 600; margin-bottom: 10px;
+}
+.chart-dialog { width: min(920px, calc(100vw - 16px)); }
+.chart-body { display: flex; flex-direction: column; gap: 10px; }
+.chart-head { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+#chartCanvas { width: 100%; background: #0e2a32; border-radius: 12px; }
+.chart-legend { font-size: 0.8rem; color: var(--muted); }
+.toast {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  background: #0b3d4a; color: #fff; padding: 10px 14px; border-radius: 999px;
+  z-index: 99; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.2);
+}
