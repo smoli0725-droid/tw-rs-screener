@@ -711,13 +711,14 @@ def screen_one(ticker: str, ohlcv: dict, meta: dict,
 
 def screen_patterns(ohlcv: dict, ranking: pd.DataFrame,
                     min_rs: int = 85,
+                    require_template: bool = True,
                     p: PatternParams = PARAMS) -> list[dict]:
     """對 RS≥min_rs 的股票跑型態篩選。
 
+    預設再限制「通過趨勢樣板」(通過樣板 == ✔),避免名單過寬。
     ranking: export() 回傳的完整排名表(含 代號/名稱/RS/...)。
     ohlcv columns 為 yf_ticker。
     """
-    uni_map = {}
     # 建立 代號 → yf_ticker
     close_cols = list(ohlcv["Close"].columns)
     id_to_yf = {}
@@ -726,6 +727,10 @@ def screen_patterns(ohlcv: dict, ranking: pd.DataFrame,
         id_to_yf[sid] = col
 
     top = ranking[ranking["RS"] >= min_rs].copy()
+    if require_template:
+        # rs_calculator 以 U+2714 ✔ 標記通過
+        passed = top["通過樣板"].fillna("").astype(str).str.strip()
+        top = top[passed == "✔"].copy()
     all_hits: list[dict] = []
     for _, row in top.iterrows():
         sid = str(row["代號"])
@@ -752,7 +757,8 @@ def screen_patterns(ohlcv: dict, ranking: pd.DataFrame,
         abs(x.get("dist_pivot_pct") or 99),
         -x.get("score", 0),
     ))
-    print(f"[patterns] RS≥{min_rs} 掃描 {len(top)} 檔,命中 {len(all_hits)} 筆型態")
+    scope = f"RS≥{min_rs}" + (" 且通過趨勢樣板" if require_template else "")
+    print(f"[patterns] {scope} 掃描 {len(top)} 檔,命中 {len(all_hits)} 筆型態")
     return all_hits
 
 
