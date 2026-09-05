@@ -1,6 +1,6 @@
 {
-  "name": "台股 RS 選股",
-  "short_name": "RS選股",
+  "name": "TradingVenator",
+  "short_name": "TradingVenator",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#f4f7f5",
