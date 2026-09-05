@@ -1,17 +1,17 @@
 {
-  "data_date": null,
-  "generated_at": null,
-  "is_fresh": false,
-  "is_trading_day": null,
-  "source_checked_at": null,
-  "message": "placeholder — awaiting first workflow run after merge",
+  "data_date": "2026-09-04",
+  "generated_at": "2026-09-05T11:30:30.910459+08:00",
+  "is_fresh": true,
+  "is_trading_day": false,
+  "source_checked_at": "2026-09-05T10:47:58.123594+08:00",
+  "message": "週末,沿用 2026-09-04",
   "twse_cross_check": null,
   "counts": {
-    "rs85": 0,
-    "patterns": 0,
-    "near_breakout": 0,
-    "broke_out": 0,
-    "ohlcv_symbols": 0,
-    "universe": 0
+    "rs85": 291,
+    "patterns": 541,
+    "near_breakout": 77,
+    "broke_out": 146,
+    "ohlcv_symbols": 265,
+    "universe": 1961
   }
 }
