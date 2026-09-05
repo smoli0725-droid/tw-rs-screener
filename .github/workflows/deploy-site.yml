@@ -43,14 +43,23 @@ jobs:
             echo '[]' > site/data/rs85.json
             echo '[]' > site/data/patterns.json
           fi
-          # Cloudflare 不需要 .nojekyll，但留著無妨
           touch site/.nojekyll
           ls -la site/data | head
+
+      # CI 無法互動建立專案；deploy 在專案不存在時會失敗 (8000007)
+      - name: Ensure Cloudflare Pages project exists
+        uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "3.99.0"
+          command: pages project create tw-rs-screener --production-branch=main
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # 第一次會自動建立專案；之後同一名稱即更新
-          command: pages deploy site --project-name=tw-rs-screener --commit-dirty=true
+          wranglerVersion: "3.99.0"
+          command: pages deploy site --project-name=tw-rs-screener --branch=main --commit-dirty=true
