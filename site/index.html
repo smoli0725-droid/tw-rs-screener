@@ -40,9 +40,11 @@
     </section>
 
     <section id="view-recommend" class="view">
+      <div id="marketCard" class="card market-card"></div>
       <div class="tabs">
         <button class="tab active" data-sub="rs85" type="button">RS≥85</button>
-        <button class="tab" data-sub="patterns" type="button">型態／即將突破</button>
+        <button class="tab" data-sub="patterns" type="button">型態／突破</button>
+        <button class="tab" data-sub="breakouts" type="button">交易追蹤</button>
       </div>
 
       <div id="sub-rs85" class="subview active">
@@ -62,13 +64,30 @@
         <div class="filters">
           <div id="statusChips" class="chips">
             <button class="chip active" data-status="即將突破" type="button">即將突破</button>
-            <button class="chip" data-status="已突破" type="button">已突破</button>
+            <button class="chip active" data-status="已突破" type="button">已突破（可買 0~5%）</button>
             <button class="chip" data-status="整理中" type="button">整理中</button>
+            <button class="chip" data-status="已延伸" type="button">已延伸</button>
           </div>
           <div id="patternChips" class="chips wrap"></div>
         </div>
         <div id="patternCount" class="count-line"></div>
         <div id="patternList" class="list"></div>
+        <p class="hint">同一檔多種型態時只顯示「主要型態」的樞紐，其餘列在卡片下方。已延伸 = 收盤高出樞紐 5% 以上或突破已超過 10 個交易日。</p>
+      </div>
+
+      <div id="sub-breakouts" class="subview">
+        <div class="filters">
+          <div id="tradeChips" class="chips">
+            <button class="chip active" data-trade="active" type="button">進行中</button>
+            <button class="chip active" data-trade="success" type="button">成功</button>
+            <button class="chip active" data-trade="failed" type="button">失敗</button>
+            <button class="chip active" data-trade="recovered" type="button">復甦</button>
+            <button class="chip" data-trade="reentered" type="button">再突破</button>
+          </div>
+        </div>
+        <div id="tradeCount" class="count-line"></div>
+        <div id="tradeList" class="list"></div>
+        <p class="hint">規則：收盤站上樞紐即記一筆交易；之後收盤 ≥ 樞紐 +10% 為成功、≤ 樞紐 −5% 為失敗。失敗後若收盤回到樞紐下方 0~5% 為復甦，重新列入即將突破。市況 = 近 10 個交易日內判定的成功 ÷（成功＋失敗）。</p>
       </div>
     </section>
 
