@@ -200,18 +200,7 @@
   }
 
   function renderPatterns() {
-    // 一檔只認一個樞紐:清單只列主要型態;次要型態只在卡片下方「另符合」顯示,
-    // 不受狀態濾鏡影響,也不會自己成為一張卡
-    const othersById = new Map();
-    for (const r of state.patterns) {
-      if (r.primary === false) {
-        if (!othersById.has(r.id)) othersById.set(r.id, []);
-        othersById.get(r.id).push(r);
-      } else if (Array.isArray(r.others) && r.others.length) {
-        othersById.set(r.id, [...(othersById.get(r.id) || []), ...r.others]);
-      }
-    }
-    // 資料端已保證一檔一筆;這裡再去重一次以防舊資料
+    // 一檔一型態:資料端已只輸出一筆;這裡再依代號去重以防舊資料
     const seen = new Set();
     let rows = state.patterns.filter((r) => {
       if (r.primary === false || seen.has(r.id)) return false;
@@ -219,33 +208,22 @@
       return true;
     });
     if (state.statuses.size) rows = rows.filter((r) => state.statuses.has(r.status));
-    if (state.patternTypes.size) {
-      rows = rows.filter(
-        (r) =>
-          state.patternTypes.has(r.pattern) ||
-          (othersById.get(r.id) || []).some((o) => state.patternTypes.has(o.pattern))
-      );
-    }
-    const cards = rows.map((r) => ({ main: r, others: othersById.get(r.id) || [] }));
-    $('#patternCount').textContent = `${cards.length} 檔`;
+    if (state.patternTypes.size) rows = rows.filter((r) => state.patternTypes.has(r.pattern));
+    $('#patternCount').textContent = `${rows.length} 檔`;
     const list = $('#patternList');
-    if (!cards.length) {
+    if (!rows.length) {
       list.innerHTML = '<div class="empty">沒有符合的型態</div>';
       return;
     }
-    list.innerHTML = cards
-      .map(({ main: r, others }) => {
+    list.innerHTML = rows
+      .map((r) => {
         const cls = STATUS_CLASS[r.status] || 'warn';
         const bo = r.breakout_date
           ? ` · 突破 ${String(r.breakout_date).slice(5)}${
               r.days_since_breakout != null ? `（${r.days_since_breakout} 日前）` : ''
             }`
           : '';
-        const extra = others.length
-          ? `<div class="item-extra">另符合：${others
-              .map((o) => `${esc(o.pattern)} 樞紐 ${fmt.money(o.pivot)}（${esc(o.status)}）`)
-              .join(' · ')}</div>`
-          : '';
+        const pos = r.detail && r.detail.position ? `（${esc(r.detail.position)}）` : '';
         return `<article class="item" data-open-chart="${r.id}" data-name="${esc(r.name)}" data-market="${esc(
           r.market
         )}" data-pivot="${r.pivot ?? ''}">
@@ -253,12 +231,11 @@
             <div class="item-title">${r.id} ${esc(r.name)}<span class="badge ${cls}">${esc(r.status)}</span>${
           r.recovered ? '<span class="badge hot">復甦</span>' : ''
         }</div>
-            <div class="item-sub">${esc(r.pattern_label || r.pattern)} · RS ${r.rs} · ${fmt.money(r.close)}<br/>
+            <div class="item-sub">${esc(r.pattern_label || r.pattern)}${pos} · RS ${r.rs} · ${fmt.money(r.close)}<br/>
 樞紐 ${fmt.money(r.pivot)}（${fmtDist(r.dist_pivot_pct)}）${bo}<br/>
 ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.base_weeks + '週 · ' : ''}${
           r.structure_date ? '結構 ' + String(r.structure_date).slice(5) : ''
         }${r.vol_dry_ratio != null ? ' · 量縮 ' + r.vol_dry_ratio : ''}</div>
-            ${extra}
           </div>
           <div class="item-right"><div><strong>${
             r.score != null ? Number(r.score).toFixed(0) : ''

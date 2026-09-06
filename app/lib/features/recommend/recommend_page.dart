@@ -223,9 +223,7 @@ class _PatternsTabState extends ConsumerState<_PatternsTab> {
 
   static const allPatterns = [
     'VCP',
-    '3-C',
-    '低位作弊',
-    '杯狀帶柄',
+    '作弊型態',
     '雙重底',
     '高聳旗形',
   ];
@@ -347,7 +345,10 @@ class _PatternsTabState extends ConsumerState<_PatternsTab> {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text('${r.patternLabel} · RS ${r.rs} · ${fmtMoney(r.close)}'),
+                            Text(
+                              '${r.patternLabel}${r.position != null ? '（${r.position}）' : ''}'
+                              ' · RS ${r.rs} · ${fmtMoney(r.close)}',
+                            ),
                             Text(
                               '樞紐 ${fmtMoney(r.pivot)}（${fmtPctPoints(r.distPivotPct)}）'
                               '${r.contraction != null ? ' · ${r.contraction}' : ''}'
