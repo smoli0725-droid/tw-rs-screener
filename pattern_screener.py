@@ -2,8 +2,13 @@
 """
 Minervini 風格股價型態篩選器
 ============================
-六種型態:VCP、3-C 作弊、低位作弊、杯狀帶柄、雙重底、強勁攻勢/高聳旗形。
+四種型態:VCP、作弊型態(合併 3-C / 低位作弊 / 上緣杯柄)、雙重底、強勁攻勢/高聳旗形。
 所有門檻集中於下方 PatternParams,方便依實戰結果調整。
+
+一檔一型態
+----------
+同一段 K 線只承認一個結構:四個偵測器都跑,但 `screen_one` 只回傳
+「結構完成日最新」的那一個(同日再看狀態、分數),其餘丟棄。
 
 Pivot 原則
 ----------
@@ -50,27 +55,20 @@ class PatternParams:
     vcp_shrink_hi: float = 0.80
     vcp_last_max_pct: float = 10.0       # 最後一段 ≤ 10%
 
-    # 3-C / 低位作弊
+    # 作弊型態(基底 + 基底內停頓區;停頓區位置決定 低位 / 中段 3-C / 上緣杯柄)
     cheat_prior_min_months: int = 3
     cheat_prior_max_months: int = 36
     cheat_prior_gain_min: float = 0.25   # 先前漲幅 ≥ 25%
-    cheat_base_min_weeks: int = 3
+    cheat_base_min_weeks: int = 3        # 左高 → 停頓區結束
     cheat_base_max_weeks: int = 45
-    cheat_max_depth: float = 0.60        # 修正 ≤ 60%
+    cheat_min_depth: float = 0.12        # 基底修正 12~60%
+    cheat_max_depth: float = 0.60
+    cheat_right_max_over: float = 0.05   # 底部之後任何高點不得高於左高 5%(否則已在漲,不是基底)
     cheat_pause_min_bars: int = 5
     cheat_pause_range_pct: float = 10.0  # 停頓區高低差 ≤ 10%
-    cheat_mid_lo: float = 1.0 / 3.0      # 中間 1/3 深度區間
-    cheat_mid_hi: float = 2.0 / 3.0
-    cheat_low_hi: float = 1.0 / 3.0      # 低位:下方 1/3
-
-    # 杯狀帶柄
-    cup_min_depth: float = 0.12
-    cup_max_depth: float = 0.50
-    cup_right_near_pct: float = 0.10     # 右側回到左高 10% 內
-    handle_min_bars: int = 5
-    handle_max_bars: int = 20
-    handle_max_drop: float = 0.12
-    handle_upper_half: bool = True
+    cheat_low_hi: float = 1.0 / 3.0      # 停頓區中點 < 下 1/3 → 低位
+    cheat_mid_hi: float = 2.0 / 3.0      # 1/3~2/3 → 中段 3-C;> 2/3 → 上緣(杯柄)
+    cheat_upper_min_weeks: int = 6       # 上緣杯柄的基底至少 6 週
 
     # 雙重底
     db_min_weeks: int = 3
@@ -329,9 +327,9 @@ def detect_vcp(o: pd.Series, h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Ser
     }
 
 
-def _find_cup_structure(h: pd.Series, l: pd.Series, c: pd.Series,
-                        p: PatternParams) -> dict | None:
-    """找最近的杯狀結構:左高 → 杯底 → 右高(接近左高)。只用已確認轉折。"""
+def _find_base_structure(h: pd.Series, l: pd.Series, c: pd.Series,
+                         p: PatternParams) -> dict | None:
+    """找最近的基底:左高(確認 H) → 底(確認 L),修正深度在 cheat_min_depth~cheat_max_depth。"""
     pivots = zigzag(h, l, c, max(p.zigzag_pct * 0.75, 0.05))
     if len(pivots) < 2:
         return None
@@ -340,31 +338,14 @@ def _find_cup_structure(h: pd.Series, l: pd.Series, c: pd.Series,
         if pv["kind"] != "L":
             continue
         left_hs = [x for x in pivots[:i] if x["kind"] == "H"]
-        right_hs = [x for x in pivots[i + 1:] if x["kind"] == "H"]
         if not left_hs:
             continue
         left = left_hs[-1]
-        cup_low = pv
-        depth = (left["price"] - cup_low["price"]) / left["price"]
-        if not (p.cup_min_depth <= depth <= max(p.cup_max_depth, p.cheat_max_depth)):
+        depth = (left["price"] - pv["price"]) / left["price"]
+        if not (p.cheat_min_depth <= depth <= p.cheat_max_depth):
             continue
-        if right_hs:
-            right_edge = right_hs[0]
-        else:
-            right_edge = {
-                "idx": len(c) - 1,
-                "date": _bar_date(c.index, len(c) - 1),
-                "price": float(c.iloc[-1]),
-                "kind": "H",
-                "confirmed": False,
-            }
-        base_weeks = (right_edge["idx"] - left["idx"]) / 5
-        candidate = {
-            "left": left, "bottom": cup_low, "right": right_edge,
-            "depth": depth, "base_weeks": base_weeks,
-        }
-        if best is None or cup_low["idx"] > best["bottom"]["idx"]:
-            best = candidate
+        if best is None or pv["idx"] > best["bottom"]["idx"]:
+            best = {"left": left, "bottom": pv, "depth": depth}
     return best
 
 
@@ -401,9 +382,19 @@ def _pause_zone(h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Series,
     return best
 
 
-def detect_cheat(o, h, l, c, v, low_position: bool = False,
-                 p: PatternParams = PARAMS) -> dict | None:
-    """3-C 作弊 / 低位作弊。"""
+CHEAT_POS_LOW = "低位"
+CHEAT_POS_MID = "中段 3-C"
+CHEAT_POS_UPPER = "上緣（杯柄）"
+
+
+def detect_cheat_pattern(o, h, l, c, v, p: PatternParams = PARAMS) -> dict | None:
+    """作弊型態:基底(左高 → 底)+ 基底內的停頓區,pivot = 停頓區高點。
+
+    停頓區在基底的相對位置決定子類型:下 1/3 低位、中 1/3 3-C、上 1/3 杯柄。
+    底部之後若任何高點已高於左高 5% 以上,代表股價早已脫離基底在漲,
+    這不是作弊型態(交給 VCP / 高聳旗形 / 交易帳本),避免把飆漲後的
+    第一次回檔誤判成「杯柄」而把 pivot 放在最高上影線。
+    """
     if len(c) < 150:
         return None
     n = len(c)
@@ -421,45 +412,48 @@ def detect_cheat(o, h, l, c, v, low_position: bool = False,
     if prior_gain < p.cheat_prior_gain_min:
         return None
 
-    cup = _find_cup_structure(h, l, c, p)
-    if cup is None:
+    base = _find_base_structure(h, l, c, p)
+    if base is None:
         return None
-    if not (p.cheat_base_min_weeks <= cup["base_weeks"] <= p.cheat_base_max_weeks):
-        return None
-    if cup["depth"] > p.cheat_max_depth:
-        return None
-
-    left, bottom = cup["left"], cup["bottom"]
-    cup_range = left["price"] - bottom["price"]
-    if cup_range <= 0:
+    left, bottom = base["left"], base["bottom"]
+    base_range = left["price"] - bottom["price"]
+    if base_range <= 0:
         return None
 
     pause = _pause_zone(h, l, c, v, bottom["idx"], p)
     if pause is None or not _is_recent(pause["end_idx"], n, p):
         return None
 
-    pause_mid = (pause["high"] + pause["low"]) / 2
-    rel = (pause_mid - bottom["price"]) / cup_range  # 0=底部,1=左高
+    # 右側上限:底部之後到停頓區結束,任何高點不得高於左高 × (1 + cheat_right_max_over)
+    cap = left["price"] * (1 + p.cheat_right_max_over)
+    if float(h.iloc[bottom["idx"]:pause["end_idx"] + 1].max()) > cap:
+        return None
 
-    if low_position:
-        if rel > p.cheat_low_hi:
-            return None
-        label, code = "低位作弊", "低位作弊"
+    base_weeks = (pause["end_idx"] - left["idx"]) / 5
+    if not (p.cheat_base_min_weeks <= base_weeks <= p.cheat_base_max_weeks):
+        return None
+
+    pause_mid = (pause["high"] + pause["low"]) / 2
+    rel = (pause_mid - bottom["price"]) / base_range  # 0=底部,1=左高
+    if rel < p.cheat_low_hi:
+        position = CHEAT_POS_LOW
+    elif rel <= p.cheat_mid_hi:
+        position = CHEAT_POS_MID
     else:
-        if not (p.cheat_mid_lo <= rel <= p.cheat_mid_hi):
+        position = CHEAT_POS_UPPER
+        if base_weeks < p.cheat_upper_min_weeks:
             return None
-        label, code = "3-C 作弊", "3-C"
 
     pivot = float(pause["high"])
     pause_end_date = _bar_date(c.index, pause["end_idx"])
     return {
-        "pattern": code,
-        "pattern_label": label,
-        **_finish(c, v, pivot, p, cup["depth"] * 100),
+        "pattern": "作弊型態",
+        "pattern_label": "作弊型態",
+        **_finish(c, v, pivot, p, base["depth"] * 100),
         "contraction": None,
         "legs": None,
-        "base_weeks": round(cup["base_weeks"], 1),
-        "depth_pct": round(cup["depth"] * 100, 1),
+        "base_weeks": round(base_weeks, 1),
+        "depth_pct": round(base["depth"] * 100, 1),
         "structure_date": pause_end_date,
         "annotations": [
             {"type": "cup_left", "date": left["date"], "price": left["price"]},
@@ -467,66 +461,11 @@ def detect_cheat(o, h, l, c, v, low_position: bool = False,
             {"type": "pause_high", "date": pause_end_date, "price": round(pivot, 2)},
         ],
         "detail": {
+            "position": position,
             "prior_gain_pct": round(prior_gain * 100, 1),
             "pause_rel": round(rel, 2),
             "pause_range_pct": pause["range_pct"],
         },
-    }
-
-
-def detect_cup_with_handle(o, h, l, c, v, p: PatternParams = PARAMS) -> dict | None:
-    cup = _find_cup_structure(h, l, c, p)
-    if cup is None:
-        return None
-    if not (p.cup_min_depth <= cup["depth"] <= p.cup_max_depth):
-        return None
-    left, bottom, right = cup["left"], cup["bottom"], cup["right"]
-    if not right.get("confirmed", True):
-        return None  # 右側尚未形成確認高點,柄無從定義
-    if right["price"] < left["price"] * (1 - p.cup_right_near_pct):
-        return None
-
-    n = len(c)
-    handle_start = right["idx"]
-    # 柄部不含今天(今天若為突破日,其高點不可成為 pivot)
-    handle_h = h.iloc[handle_start:n - 1]
-    handle_l = l.iloc[handle_start:n - 1]
-    if len(handle_h) < p.handle_min_bars:
-        return None
-    if len(handle_h) > p.handle_max_bars:
-        return None  # 柄拖太久,結構失效
-    handle_end_idx = handle_start + len(handle_h) - 1
-    if not _is_recent(handle_end_idx, n, p):
-        return None
-
-    handle_high = float(handle_h.max())
-    handle_low = float(handle_l.min())
-    if handle_high <= 0:
-        return None
-    drop = (handle_high - handle_low) / handle_high
-    if drop > p.handle_max_drop:
-        return None
-    cup_mid = (left["price"] + bottom["price"]) / 2
-    if p.handle_upper_half and handle_low < cup_mid:
-        return None
-
-    pivot = handle_high
-    return {
-        "pattern": "杯狀帶柄",
-        "pattern_label": "夢幻型態／杯狀帶柄",
-        **_finish(c, v, pivot, p, drop * 100),
-        "contraction": None,
-        "legs": None,
-        "base_weeks": round(cup["base_weeks"], 1),
-        "depth_pct": round(cup["depth"] * 100, 1),
-        "structure_date": _bar_date(c.index, handle_end_idx),
-        "annotations": [
-            {"type": "cup_left", "date": left["date"], "price": left["price"]},
-            {"type": "cup_bottom", "date": bottom["date"], "price": bottom["price"]},
-            {"type": "handle_high", "date": right["date"], "price": round(pivot, 2)},
-            {"type": "handle_low", "price": round(handle_low, 2)},
-        ],
-        "detail": {"handle_drop_pct": round(drop * 100, 1)},
     }
 
 
@@ -689,9 +628,7 @@ def _score(status: str, close: float, pivot: float, vol_ratio: float,
 
 DETECTORS = [
     detect_vcp,
-    lambda o, h, l, c, v, p=PARAMS: detect_cheat(o, h, l, c, v, False, p),
-    lambda o, h, l, c, v, p=PARAMS: detect_cheat(o, h, l, c, v, True, p),
-    detect_cup_with_handle,
+    detect_cheat_pattern,
     detect_double_bottom,
     detect_high_tight_flag,
 ]
@@ -721,19 +658,27 @@ def screen_one(ticker: str, ohlcv: dict, meta: dict,
             hit = None
         if hit:
             hits.append({**meta, **hit})
-    return mark_primary(hits)
+    primary = pick_primary(hits)
+    return [primary] if primary else []
 
 
-def mark_primary(hits: list[dict]) -> list[dict]:
-    """同一檔多型態時,選一個「主要 pivot」:以最新結構為準,再看狀態與分數。"""
+def pick_primary(hits: list[dict]) -> dict | None:
+    """同一檔多型態時只留一個:以最新結構為準,再看狀態與分數。"""
     if not hits:
-        return hits
+        return None
     ranked = sorted(hits, key=lambda x: (
         -_date_ord(x.get("structure_date") or ""),
         STATUS_ORDER.get(x.get("status"), 9),
         -(x.get("score") or 0),
     ))
     primary = ranked[0]
+    primary["primary"] = True
+    return primary
+
+
+def mark_primary(hits: list[dict]) -> list[dict]:
+    """相容舊呼叫:標記 primary 旗標(screen_one 已只回傳一個)。"""
+    primary = pick_primary(hits)
     for hit in hits:
         hit["primary"] = hit is primary
     return hits
