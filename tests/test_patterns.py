@@ -148,6 +148,32 @@ def make_cheat_series(pause_level: float, pause_bars: int = 12, n: int = 250):
     return _ohlc_from_close(close, vol_base=120_000)
 
 
+def make_staircase_base_series(n: int = 250):
+    """富采式:100 → 階梯下跌(彈 68、58)→ 底 52 → 反彈到 70~74 停頓。
+
+    左緣應是 100(整段修正 48%),不是最後一個小反彈的 58。
+    """
+    dates = _dates(n)
+    px = np.full(n, 60.0)
+    segs = [
+        np.linspace(60, 100, 40),   # 上漲到 100(左高)
+        np.linspace(100, 70, 8),
+        np.linspace(70, 78, 4),     # 小反彈
+        np.linspace(78, 60, 8),
+        np.linspace(60, 66, 4),     # 小反彈
+        np.linspace(66, 52, 8),     # 底 52
+        np.linspace(52, 72, 12),
+    ]
+    seq = np.concatenate(segs)
+    pause = np.array([72 * (1.02 if i % 2 == 0 else 0.98) for i in range(10)])
+    seq = np.concatenate([seq, pause])
+    start = n - len(seq) - 1
+    px[start:start + len(seq)] = seq
+    px[start + len(seq):] = 72.0
+    close = pd.Series(px, index=dates)
+    return _ohlc_from_close(close, vol_base=120_000)
+
+
 def make_blowoff_series(n: int = 250):
     """川湖式走勢:小跌 20% 後直線漲 70%,再回檔 8% 盤整 → 不是基底。"""
     dates = _dates(n)
@@ -320,6 +346,18 @@ def test_cheat_position_labels():
         assert hit["detail"]["position"] == expect, (level, hit["detail"])
         assert abs(hit["pivot"] - float(h.iloc[-13:-1].max())) < 0.01
         assert hit["pivot"] <= 105  # 不得超過左高 5%
+
+
+def test_cheat_base_left_high_is_start_of_decline():
+    """階梯式下跌的大基底:左高要抓整段修正起點(100),不是底部前最後一個小反彈(66)。"""
+    o, h, l, c, v = make_staircase_base_series()
+    hit = detect_cheat_pattern(o, h, l, c, v)
+    assert hit is not None
+    left = next(a for a in hit["annotations"] if a["type"] == "cup_left")
+    assert left["price"] > 95, left
+    assert 40 <= hit["depth_pct"] <= 55
+    # 停頓區 72 在 52~100 的中段 → 3-C
+    assert hit["detail"]["position"] == CHEAT_POS_MID
 
 
 def test_cheat_rejects_right_side_blowoff():

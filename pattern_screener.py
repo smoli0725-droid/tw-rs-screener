@@ -329,7 +329,12 @@ def detect_vcp(o: pd.Series, h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Ser
 
 def _find_base_structure(h: pd.Series, l: pd.Series, c: pd.Series,
                          p: PatternParams) -> dict | None:
-    """找最近的基底:左高(確認 H) → 底(確認 L),修正深度在 cheat_min_depth~cheat_max_depth。"""
+    """找最近的基底:左高(確認 H) → 底(確認 L),修正深度在 cheat_min_depth~cheat_max_depth。
+
+    左高 = 從底部往回掃,直到遇到「比底部更低的低點」為止,這段期間最高的確認高點。
+    階梯式下跌(跌、彈、再跌)每次小反彈都會留下轉折高點,若只取底部前一格的
+    高點會把最後一個小反彈當成基底左緣,把整個大基底看小。
+    """
     pivots = zigzag(h, l, c, max(p.zigzag_pct * 0.75, 0.05))
     if len(pivots) < 2:
         return None
@@ -337,10 +342,14 @@ def _find_base_structure(h: pd.Series, l: pd.Series, c: pd.Series,
     for i, pv in enumerate(pivots):
         if pv["kind"] != "L":
             continue
-        left_hs = [x for x in pivots[:i] if x["kind"] == "H"]
-        if not left_hs:
+        left = None
+        for x in reversed(pivots[:i]):
+            if x["kind"] == "L" and x["price"] < pv["price"]:
+                break
+            if x["kind"] == "H" and (left is None or x["price"] > left["price"]):
+                left = x
+        if left is None:
             continue
-        left = left_hs[-1]
         depth = (left["price"] - pv["price"]) / left["price"]
         if not (p.cheat_min_depth <= depth <= p.cheat_max_depth):
             continue
