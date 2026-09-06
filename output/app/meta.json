@@ -1,17 +1,35 @@
 {
   "data_date": "2026-09-04",
-  "generated_at": "2026-09-05T15:46:40.158310+08:00",
+  "generated_at": "2026-09-06T15:32:23.322982+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-09-05T15:27:56.298150+08:00",
+  "source_checked_at": "2026-09-06T15:32:14.523096+08:00",
   "message": "週末,沿用 2026-09-04",
   "twse_cross_check": null,
   "counts": {
     "rs85": 291,
-    "patterns": 232,
-    "near_breakout": 40,
-    "broke_out": 77,
-    "ohlcv_symbols": 111,
+    "patterns": 28,
+    "pattern_symbols": 23,
+    "near_breakout": 7,
+    "broke_out": 6,
+    "ohlcv_symbols": 33,
     "universe": 1961
+  },
+  "market": {
+    "as_of": "2026-09-04",
+    "window_days": 10,
+    "window_start": "2026-08-24",
+    "wins": 5,
+    "losses": 0,
+    "pending": 8,
+    "recovered": 0,
+    "win_rate": 1.0,
+    "label": "市況良好",
+    "rules": {
+      "buy_zone_pct": 5.0,
+      "success_pct": 10.0,
+      "fail_pct": 5.0,
+      "near_pivot_pct": 5.0
+    }
   }
 }
