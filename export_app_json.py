@@ -75,9 +75,72 @@ def _pattern_to_json(p: dict) -> dict:
         "vol_dry_ratio": p.get("vol_dry_ratio"),
         "base_weeks": p.get("base_weeks"),
         "depth_pct": p.get("depth_pct"),
+        "primary": bool(p.get("primary", True)),
+        "structure_date": p.get("structure_date"),
+        "breakout_date": p.get("breakout_date"),
+        "days_since_breakout": p.get("days_since_breakout"),
+        "recovered": bool(p.get("recovered", False)),
         "annotations": p.get("annotations") or [],
         "detail": p.get("detail") or {},
     }
+
+
+def _recovered_rows(ledger: dict | None, ranking: pd.DataFrame,
+                    ohlcv: dict, existing_ids: set[str]) -> list[dict]:
+    """把帳本中「復甦」的交易注入型態清單(即將突破),不重複已有主要型態的股票。"""
+    if not ledger:
+        return []
+    from breakout_tracker import recovered_candidates
+    from pattern_screener import STATUS_NEAR, PARAMS, _score, vol_dry_ratio
+
+    by_id = {str(r["代號"]): r for _, r in ranking.iterrows()} if len(ranking) else {}
+    rows = []
+    for t in recovered_candidates(ledger):
+        sid = str(t["id"])
+        if sid in existing_ids:
+            continue
+        yf = t.get("yf_ticker") or ""
+        try:
+            c = ohlcv["Close"][yf].dropna()
+            v = ohlcv["Volume"][yf].reindex(c.index).fillna(0)
+        except Exception:
+            continue
+        if not len(c):
+            continue
+        close = float(c.iloc[-1])
+        pivot = float(t["pivot"])
+        vr = vol_dry_ratio(v)
+        row = by_id.get(sid)
+        rows.append({
+            "代號": sid,
+            "名稱": t.get("name") or (row["名稱"] if row is not None else sid),
+            "市場": t.get("market") or (row["市場"] if row is not None else ""),
+            "產業": row["產業"] if row is not None else "",
+            "RS": int(row["RS"]) if row is not None else int(t.get("rs") or 0),
+            "收盤價": close,
+            "通過樣板": row.get("通過樣板", "") if row is not None else "",
+            "距50MA%": float(row["距50MA%"]) if row is not None and pd.notna(row.get("距50MA%")) else None,
+            "yf_ticker": yf,
+            "pattern": t.get("pattern"),
+            "pattern_label": f"{t.get('pattern_label') or t.get('pattern')}（復甦）",
+            "pivot": round(pivot, 2),
+            "dist_pivot_pct": round((close / pivot - 1) * 100, 2),
+            "status": STATUS_NEAR,
+            "score": _score(STATUS_NEAR, close, pivot, vr, 10),
+            "contraction": None,
+            "legs": None,
+            "vol_dry_ratio": None if np.isnan(vr) else round(vr, 2),
+            "base_weeks": None,
+            "depth_pct": None,
+            "primary": True,
+            "structure_date": t.get("outcome_date"),
+            "breakout_date": None,
+            "days_since_breakout": None,
+            "recovered": True,
+            "annotations": [{"type": "failed_breakout", "date": t.get("breakout_date"), "price": pivot}],
+            "detail": {"failed_on": t.get("outcome_date"), "failed_pct": t.get("outcome_pct")},
+        })
+    return rows
 
 
 def _ohlcv_for_symbol(ohlcv: dict, yf_ticker: str, annotations: list,
@@ -123,10 +186,15 @@ def _ohlcv_for_symbol(ohlcv: dict, yf_ticker: str, annotations: list,
 
 def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
                     ohlcv: dict, freshness: dict,
-                    outdir: str = "output/app") -> dict:
+                    outdir: str = "output/app",
+                    ledger: dict | None = None) -> dict:
     os.makedirs(outdir, exist_ok=True)
     ohlcv_dir = os.path.join(outdir, "ohlcv")
     os.makedirs(ohlcv_dir, exist_ok=True)
+
+    # 帳本中的「復甦」交易注入即將突破清單
+    primary_ids = {str(p["代號"]) for p in patterns if p.get("primary", True)}
+    patterns = list(patterns) + _recovered_rows(ledger, ranking, ohlcv, primary_ids)
 
     tags = patterns_by_symbol(patterns)
     top = ranking[ranking["RS"] >= 85].copy()
@@ -160,8 +228,22 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
                 json.dump(_json_safe(data), f, ensure_ascii=False)
             ohlcv_count += 1
 
-    near_count = sum(1 for p in pattern_rows if p["status"] == "即將突破")
-    broke_count = sum(1 for p in pattern_rows if p["status"] == "已突破")
+    primary_rows = [p for p in pattern_rows if p.get("primary", True)]
+    near_count = sum(1 for p in primary_rows if p["status"] == "即將突破")
+    broke_count = sum(1 for p in primary_rows if p["status"] == "已突破")
+    extended_count = sum(1 for p in primary_rows if p["status"] == "已延伸")
+
+    market = (ledger or {}).get("market")
+    if ledger is not None:
+        from breakout_tracker import recent_trades
+        breakouts = {
+            "as_of": freshness.get("data_date"),
+            "market": market,
+            "history": ledger.get("history", [])[-60:],
+            "trades": recent_trades(ledger),
+        }
+        with open(os.path.join(outdir, "breakouts.json"), "w", encoding="utf-8") as f:
+            json.dump(_json_safe(breakouts), f, ensure_ascii=False)
 
     meta = {
         "data_date": freshness.get("data_date"),
@@ -174,11 +256,14 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
         "counts": {
             "rs85": len(rs85),
             "patterns": len(pattern_rows),
+            "pattern_symbols": len({p["id"] for p in pattern_rows}),
             "near_breakout": near_count,
             "broke_out": broke_count,
+            "extended": extended_count,
             "ohlcv_symbols": ohlcv_count,
             "universe": len(ranking),
         },
+        "market": market,
     }
 
     with open(os.path.join(outdir, "meta.json"), "w", encoding="utf-8") as f:
@@ -188,6 +273,8 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
     with open(os.path.join(outdir, "patterns.json"), "w", encoding="utf-8") as f:
         json.dump(_json_safe(pattern_rows), f, ensure_ascii=False)
 
+    mk = f" | 市況 {market['label']} 勝率={market['win_rate']} ({market['wins']}勝{market['losses']}敗, 進行中 {market['pending']})" \
+        if market else ""
     print(f"[export] app JSON → {outdir} | RS85={len(rs85)} "
-          f"patterns={len(pattern_rows)}(即將突破={near_count}) ohlcv={ohlcv_count}")
+          f"patterns={len(pattern_rows)}(即將突破={near_count} 已突破={broke_count}) ohlcv={ohlcv_count}{mk}")
     return meta

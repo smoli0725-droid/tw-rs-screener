@@ -27,6 +27,7 @@ RS:score = 2*(3月報酬) + (6月) + (9月) + (12月) → 全市場百分位 1�
 """
 import argparse
 import datetime as dt
+import os
 import sys
 
 import numpy as np
@@ -405,8 +406,19 @@ def main():
     if not args.skip_patterns:
         from pattern_screener import screen_patterns
         from export_app_json import export_app_json
+        from breakout_tracker import load_ledger, save_ledger, update_ledger
         patterns = screen_patterns(ohlcv, full, min_rs=85)
-        export_app_json(full, patterns, ohlcv, freshness, outdir="output/app")
+
+        # 突破交易帳本:pivot 在突破日凍結,逐日判定成功/失敗,彙整近兩週勝率
+        ledger_path = os.path.join("output", "app", "breakouts_ledger.json")
+        ledger = load_ledger(ledger_path)
+        update_ledger(ledger, patterns, close, freshness["data_date"])
+        save_ledger(ledger, ledger_path)
+        m = ledger.get("market") or {}
+        print(f"[breakouts] {m.get('label')} 勝率={m.get('win_rate')} "
+              f"({m.get('wins')}勝{m.get('losses')}敗, 進行中 {m.get('pending')})", flush=True)
+
+        export_app_json(full, patterns, ohlcv, freshness, outdir="output/app", ledger=ledger)
 
 
 if __name__ == "__main__":
