@@ -85,6 +85,40 @@ def _pattern_to_json(p: dict) -> dict:
     }
 
 
+def _collapse_to_primary(patterns: list[dict]) -> list[dict]:
+    """一檔股票只輸出一筆(primary);其餘型態收進該筆的 others,保證任何前端都不會重複顯示。"""
+    by_id: dict[str, dict] = {}
+    others: dict[str, list] = {}
+    order: list[str] = []
+    for p in patterns:
+        sid = str(p["代號"])
+        if sid not in by_id:
+            order.append(sid)
+        if p.get("primary", True) and (sid not in by_id or not by_id[sid].get("primary", True)):
+            if sid in by_id:
+                others.setdefault(sid, []).append(by_id[sid])
+            by_id[sid] = p
+        elif sid in by_id:
+            others.setdefault(sid, []).append(p)
+        else:
+            by_id[sid] = p  # 暫代,若後面出現 primary 會被換掉
+    rows = []
+    for sid in order:
+        main = by_id[sid]
+        row = _pattern_to_json(main)
+        row["primary"] = True
+        row["others"] = [{
+            "pattern": o.get("pattern"),
+            "pattern_label": o.get("pattern_label"),
+            "pivot": o.get("pivot"),
+            "dist_pivot_pct": o.get("dist_pivot_pct"),
+            "status": o.get("status"),
+            "structure_date": o.get("structure_date"),
+        } for o in others.get(sid, [])]
+        rows.append(row)
+    return rows
+
+
 def _recovered_rows(ledger: dict | None, ranking: pd.DataFrame,
                     ohlcv: dict, existing_ids: set[str]) -> list[dict]:
     """把帳本中「復甦」的交易注入型態清單(即將突破),不重複已有主要型態的股票。"""
@@ -192,8 +226,12 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
     ohlcv_dir = os.path.join(outdir, "ohlcv")
     os.makedirs(ohlcv_dir, exist_ok=True)
 
-    # 「已延伸」不進型態清單(已由交易帳本追蹤);帳本中的「復甦」交易注入即將突破
-    patterns = [p for p in patterns if p.get("status") != "已延伸"]
+    # 主要型態為「已延伸」的股票整檔不進型態清單(已由交易帳本追蹤),
+    # 避免留下較舊的次要型態頂替成該股的樞紐;帳本中的「復甦」交易注入即將突破
+    extended_ids = {str(p["代號"]) for p in patterns
+                    if p.get("primary", True) and p.get("status") == "已延伸"}
+    patterns = [p for p in patterns
+                if str(p["代號"]) not in extended_ids and p.get("status") != "已延伸"]
     primary_ids = {str(p["代號"]) for p in patterns if p.get("primary", True)}
     patterns = patterns + _recovered_rows(ledger, ranking, ohlcv, primary_ids)
 
@@ -202,7 +240,7 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
     rs85 = [_row_to_rs85(row, tags.get(str(row["代號"]), []))
             for _, row in top.iterrows()]
 
-    pattern_rows = [_pattern_to_json(p) for p in patterns]
+    pattern_rows = _collapse_to_primary(patterns)
 
     # 僅為型態候選股輸出 OHLCV
     ann_by_id: dict[str, list] = {}

@@ -305,6 +305,32 @@ def test_export_drops_extended_rows(tmp_path):
         rows = json.load(f)
     assert [r["status"] for r in rows] == ["即將突破"]
 
+    # 一檔一筆:次要型態收進 others,不另成一筆
+    patterns2 = [
+        {**base, "pattern": "高聳旗形", "pattern_label": "高聳旗形", "pivot": 100.0,
+         "dist_pivot_pct": -4.0, "status": "即將突破", "primary": True, "structure_date": "2026-09-04"},
+        {**base, "pattern": "杯狀帶柄", "pattern_label": "杯狀帶柄", "pivot": 104.0,
+         "dist_pivot_pct": -7.8, "status": "整理中", "primary": False, "structure_date": "2026-09-03"},
+    ]
+    export_app_json(ranking, patterns2, ohlcv, fresh, outdir=str(tmp_path / "app2"))
+    with open(tmp_path / "app2" / "patterns.json") as f:
+        rows = json.load(f)
+    assert len(rows) == 1
+    assert rows[0]["pattern"] == "高聳旗形" and rows[0]["status"] == "即將突破"
+    assert [o["pattern"] for o in rows[0]["others"]] == ["杯狀帶柄"]
+
+    # 主要型態已延伸 → 整檔不出現(不讓舊的次要型態頂替)
+    patterns3 = [
+        {**base, "pattern": "VCP", "pattern_label": "VCP", "pivot": 90.0,
+         "dist_pivot_pct": 11.0, "status": "已延伸", "primary": True, "structure_date": "2026-09-04"},
+        {**base, "pattern": "雙重底", "pattern_label": "雙重底", "pivot": 104.0,
+         "dist_pivot_pct": -3.8, "status": "整理中", "primary": False, "structure_date": "2026-08-01"},
+    ]
+    export_app_json(ranking, patterns3, ohlcv, fresh, outdir=str(tmp_path / "app3"))
+    with open(tmp_path / "app3" / "patterns.json") as f:
+        rows = json.load(f)
+    assert rows == []
+
 
 # ---------------------------------------------------------------- breakout tracker
 def _close_df(prices: list[float], ticker: str = "1111.TW") -> pd.DataFrame:
