@@ -192,9 +192,10 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
     ohlcv_dir = os.path.join(outdir, "ohlcv")
     os.makedirs(ohlcv_dir, exist_ok=True)
 
-    # 帳本中的「復甦」交易注入即將突破清單
+    # 「已延伸」不進型態清單(已由交易帳本追蹤);帳本中的「復甦」交易注入即將突破
+    patterns = [p for p in patterns if p.get("status") != "已延伸"]
     primary_ids = {str(p["代號"]) for p in patterns if p.get("primary", True)}
-    patterns = list(patterns) + _recovered_rows(ledger, ranking, ohlcv, primary_ids)
+    patterns = patterns + _recovered_rows(ledger, ranking, ohlcv, primary_ids)
 
     tags = patterns_by_symbol(patterns)
     top = ranking[ranking["RS"] >= 85].copy()
@@ -213,6 +214,12 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
         for a in (p.get("annotations") or []):
             a2 = {**a, "pattern": p.get("pattern")}
             ann_by_id[sid].append(a2)
+    # 交易追蹤頁也要能開 K 線:補上帳本中近期交易的股票
+    for t in (ledger or {}).get("trades", []):
+        sid = str(t.get("id"))
+        if sid not in yf_by_id and t.get("yf_ticker"):
+            yf_by_id[sid] = t["yf_ticker"]
+            ann_by_id.setdefault(sid, [])
 
     ohlcv_count = 0
     for sid, yf in yf_by_id.items():
@@ -231,7 +238,6 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
     primary_rows = [p for p in pattern_rows if p.get("primary", True)]
     near_count = sum(1 for p in primary_rows if p["status"] == "即將突破")
     broke_count = sum(1 for p in primary_rows if p["status"] == "已突破")
-    extended_count = sum(1 for p in primary_rows if p["status"] == "已延伸")
 
     market = (ledger or {}).get("market")
     if ledger is not None:
@@ -259,7 +265,6 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
             "pattern_symbols": len({p["id"] for p in pattern_rows}),
             "near_breakout": near_count,
             "broke_out": broke_count,
-            "extended": extended_count,
             "ohlcv_symbols": ohlcv_count,
             "universe": len(ranking),
         },

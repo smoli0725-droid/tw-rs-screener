@@ -229,7 +229,7 @@ class _PatternsTabState extends ConsumerState<_PatternsTab> {
     '雙重底',
     '高聳旗形',
   ];
-  static const allStatus = ['即將突破', '已突破', '整理中', '已延伸'];
+  static const allStatus = ['即將突破', '已突破', '整理中'];
 
   @override
   Widget build(BuildContext context) {
