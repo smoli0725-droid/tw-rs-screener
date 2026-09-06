@@ -207,9 +207,17 @@
       if (r.primary === false) {
         if (!othersById.has(r.id)) othersById.set(r.id, []);
         othersById.get(r.id).push(r);
+      } else if (Array.isArray(r.others) && r.others.length) {
+        othersById.set(r.id, [...(othersById.get(r.id) || []), ...r.others]);
       }
     }
-    let rows = state.patterns.filter((r) => r.primary !== false);
+    // 資料端已保證一檔一筆;這裡再去重一次以防舊資料
+    const seen = new Set();
+    let rows = state.patterns.filter((r) => {
+      if (r.primary === false || seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
     if (state.statuses.size) rows = rows.filter((r) => state.statuses.has(r.status));
     if (state.patternTypes.size) {
       rows = rows.filter(
