@@ -8,9 +8,9 @@
   "twse_cross_check": null,
   "counts": {
     "rs85": 291,
-    "patterns": 28,
-    "pattern_symbols": 23,
-    "near_breakout": 7,
+    "patterns": 19,
+    "pattern_symbols": 19,
+    "near_breakout": 4,
     "broke_out": 6,
     "ohlcv_symbols": 33,
     "universe": 1961
