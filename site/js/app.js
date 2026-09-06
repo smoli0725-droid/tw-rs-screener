@@ -200,33 +200,33 @@
   }
 
   function renderPatterns() {
-    let rows = state.patterns;
-    if (state.statuses.size) rows = rows.filter((r) => state.statuses.has(r.status));
-    if (state.patternTypes.size) rows = rows.filter((r) => state.patternTypes.has(r.pattern));
-
-    // 同一檔多型態:主要型態當卡片,其餘列為「另符合」
-    const groups = new Map();
-    for (const r of rows) {
-      const g = groups.get(r.id) || { main: null, others: [] };
-      if (r.primary !== false && !g.main) g.main = r;
-      else g.others.push(r);
-      groups.set(r.id, g);
-    }
-    const cards = [...groups.values()].map((g) => {
-      if (!g.main) {
-        g.main = g.others.shift();
-        g.secondaryOnly = true;
+    // 一檔只認一個樞紐:清單只列主要型態;次要型態只在卡片下方「另符合」顯示,
+    // 不受狀態濾鏡影響,也不會自己成為一張卡
+    const othersById = new Map();
+    for (const r of state.patterns) {
+      if (r.primary === false) {
+        if (!othersById.has(r.id)) othersById.set(r.id, []);
+        othersById.get(r.id).push(r);
       }
-      return g;
-    });
-    $('#patternCount').textContent = `${cards.length} 檔 · ${rows.length} 筆型態`;
+    }
+    let rows = state.patterns.filter((r) => r.primary !== false);
+    if (state.statuses.size) rows = rows.filter((r) => state.statuses.has(r.status));
+    if (state.patternTypes.size) {
+      rows = rows.filter(
+        (r) =>
+          state.patternTypes.has(r.pattern) ||
+          (othersById.get(r.id) || []).some((o) => state.patternTypes.has(o.pattern))
+      );
+    }
+    const cards = rows.map((r) => ({ main: r, others: othersById.get(r.id) || [] }));
+    $('#patternCount').textContent = `${cards.length} 檔`;
     const list = $('#patternList');
     if (!cards.length) {
       list.innerHTML = '<div class="empty">沒有符合的型態</div>';
       return;
     }
     list.innerHTML = cards
-      .map(({ main: r, others, secondaryOnly }) => {
+      .map(({ main: r, others }) => {
         const cls = STATUS_CLASS[r.status] || 'warn';
         const bo = r.breakout_date
           ? ` · 突破 ${String(r.breakout_date).slice(5)}${
@@ -244,7 +244,7 @@
           <div>
             <div class="item-title">${r.id} ${esc(r.name)}<span class="badge ${cls}">${esc(r.status)}</span>${
           r.recovered ? '<span class="badge hot">復甦</span>' : ''
-        }${secondaryOnly ? '<span class="badge muted">次要型態</span>' : ''}</div>
+        }</div>
             <div class="item-sub">${esc(r.pattern_label || r.pattern)} · RS ${r.rs} · ${fmt.money(r.close)}<br/>
 樞紐 ${fmt.money(r.pivot)}（${fmtDist(r.dist_pivot_pct)}）${bo}<br/>
 ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.base_weeks + '週 · ' : ''}${
