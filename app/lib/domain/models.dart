@@ -113,6 +113,7 @@ class PatternHit {
     this.depthPct,
     this.templatePass = false,
     this.annotations = const [],
+    this.position,
   });
 
   final String id;
@@ -133,6 +134,8 @@ class PatternHit {
   final double? depthPct;
   final bool templatePass;
   final List<Map<String, dynamic>> annotations;
+  /// 作弊型態的停頓區位置（低位 / 中段 3-C / 上緣（杯柄））；其他型態為 null
+  final String? position;
 
   factory PatternHit.fromJson(Map<String, dynamic> j) => PatternHit(
         id: '${j['id']}',
@@ -156,6 +159,7 @@ class PatternHit {
                 ?.map((e) => Map<String, dynamic>.from(e as Map))
                 .toList() ??
             const [],
+        position: (j['detail'] is Map) ? (j['detail'] as Map)['position']?.toString() : null,
       );
 }
 

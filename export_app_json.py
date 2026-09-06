@@ -85,6 +85,25 @@ def _pattern_to_json(p: dict) -> dict:
     }
 
 
+def _one_per_symbol(patterns: list[dict]) -> list[dict]:
+    """一檔只輸出一筆。screen_one 已只回傳單一型態;這裡再依代號去重當保險(primary 優先)。"""
+    by_id: dict[str, dict] = {}
+    order: list[str] = []
+    for p in patterns:
+        sid = str(p["代號"])
+        if sid not in by_id:
+            order.append(sid)
+            by_id[sid] = p
+        elif p.get("primary", True) and not by_id[sid].get("primary", True):
+            by_id[sid] = p
+    rows = []
+    for sid in order:
+        row = _pattern_to_json(by_id[sid])
+        row["primary"] = True
+        rows.append(row)
+    return rows
+
+
 def _recovered_rows(ledger: dict | None, ranking: pd.DataFrame,
                     ohlcv: dict, existing_ids: set[str]) -> list[dict]:
     """把帳本中「復甦」的交易注入型態清單(即將突破),不重複已有主要型態的股票。"""
@@ -193,7 +212,10 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
     os.makedirs(ohlcv_dir, exist_ok=True)
 
     # 「已延伸」不進型態清單(已由交易帳本追蹤);帳本中的「復甦」交易注入即將突破
-    patterns = [p for p in patterns if p.get("status") != "已延伸"]
+    extended_ids = {str(p["代號"]) for p in patterns
+                    if p.get("primary", True) and p.get("status") == "已延伸"}
+    patterns = [p for p in patterns
+                if str(p["代號"]) not in extended_ids and p.get("status") != "已延伸"]
     primary_ids = {str(p["代號"]) for p in patterns if p.get("primary", True)}
     patterns = patterns + _recovered_rows(ledger, ranking, ohlcv, primary_ids)
 
@@ -202,7 +224,7 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
     rs85 = [_row_to_rs85(row, tags.get(str(row["代號"]), []))
             for _, row in top.iterrows()]
 
-    pattern_rows = [_pattern_to_json(p) for p in patterns]
+    pattern_rows = _one_per_symbol(patterns)
 
     # 僅為型態候選股輸出 OHLCV
     ann_by_id: dict[str, list] = {}

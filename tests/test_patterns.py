@@ -19,14 +19,18 @@ from pattern_screener import (
     detect_vcp,
     detect_double_bottom,
     detect_high_tight_flag,
-    detect_cheat,
-    detect_cup_with_handle,
+    detect_cheat_pattern,
     classify_status,
     find_breakout_idx,
     mark_primary,
+    screen_one,
     screen_patterns,
     PatternParams,
+    CHEAT_POS_LOW,
+    CHEAT_POS_MID,
+    CHEAT_POS_UPPER,
 )
+import pattern_screener
 from breakout_tracker import (
     empty_ledger,
     update_ledger,
@@ -121,6 +125,48 @@ def make_flag_series(n: int = 200):
         px[flag_start + i] = 118 + (2.5 if i % 2 == 0 else -1.5)
     close = pd.Series(px, index=dates)
     return _ohlc_from_close(close, vol_base=150_000)
+
+
+def make_cheat_series(pause_level: float, pause_bars: int = 12, n: int = 250):
+    """基底:平台 60 → 漲到 100(左高)→ 跌到 70(底)→ 反彈到 pause_level 附近盤整。"""
+    dates = _dates(n)
+    px = np.full(n, 60.0)
+    rise_start = n - 40 - 10 - 12 - pause_bars - 1
+    for i, p in enumerate(np.linspace(60, 100, 40)):
+        px[rise_start + i] = p
+    drop_start = rise_start + 40
+    for i, p in enumerate(np.linspace(100, 70, 10)):
+        px[drop_start + i] = p
+    up_start = drop_start + 10
+    for i, p in enumerate(np.linspace(70, pause_level, 12)):
+        px[up_start + i] = p
+    pause_start = up_start + 12
+    for i in range(pause_bars):
+        px[pause_start + i] = pause_level * (1.02 if i % 2 == 0 else 0.98)
+    px[pause_start + pause_bars:] = pause_level
+    close = pd.Series(px, index=dates)
+    return _ohlc_from_close(close, vol_base=120_000)
+
+
+def make_blowoff_series(n: int = 250):
+    """川湖式走勢:小跌 20% 後直線漲 70%,再回檔 8% 盤整 → 不是基底。"""
+    dates = _dates(n)
+    px = np.full(n, 60.0)
+    rise_start = n - 40 - 8 - 12 - 12 - 1
+    for i, p in enumerate(np.linspace(60, 100, 40)):
+        px[rise_start + i] = p
+    d0 = rise_start + 40
+    for i, p in enumerate(np.linspace(100, 80, 8)):
+        px[d0 + i] = p
+    u0 = d0 + 8
+    for i, p in enumerate(np.linspace(80, 170, 12)):
+        px[u0 + i] = p
+    p0 = u0 + 12
+    for i in range(12):
+        px[p0 + i] = 163 + (4 if i % 2 == 0 else -4)
+    px[p0 + 12:] = 163
+    close = pd.Series(px, index=dates)
+    return _ohlc_from_close(close, vol_base=120_000)
 
 
 def make_double_bottom_series(n: int = 200):
@@ -263,11 +309,51 @@ def test_detect_double_bottom():
     assert hit["pivot"] > 0
 
 
+def test_cheat_position_labels():
+    """停頓區在基底下/中/上 1/3 → 低位 / 中段 3-C / 上緣(杯柄),pivot = 停頓區高點。"""
+    cases = [(75.0, CHEAT_POS_LOW), (85.0, CHEAT_POS_MID), (96.0, CHEAT_POS_UPPER)]
+    for level, expect in cases:
+        o, h, l, c, v = make_cheat_series(level)
+        hit = detect_cheat_pattern(o, h, l, c, v)
+        assert hit is not None, f"pause@{level} 應偵測到作弊型態"
+        assert hit["pattern"] == "作弊型態"
+        assert hit["detail"]["position"] == expect, (level, hit["detail"])
+        assert abs(hit["pivot"] - float(h.iloc[-13:-1].max())) < 0.01
+        assert hit["pivot"] <= 105  # 不得超過左高 5%
+
+
+def test_cheat_rejects_right_side_blowoff():
+    """跌 20% 後飆漲 70% 再回檔:右側遠高於左高,不是基底,不得命中(舊版會誤判成杯柄)。"""
+    o, h, l, c, v = make_blowoff_series()
+    assert detect_cheat_pattern(o, h, l, c, v) is None
+    # 上緣杯柄基底太短(< 6 週)也不命中
+    o, h, l, c, v = make_cheat_series(96.0)
+    assert detect_cheat_pattern(o, h, l, c, v, PatternParams(cheat_upper_min_weeks=20)) is None
+
+
+def test_screen_one_returns_single_hit(monkeypatch):
+    """多個偵測器同時命中時只回傳結構最新的一個。"""
+    o, h, l, c, v = make_vcp_series()
+    ohlcv = {k: pd.DataFrame({"1111.TW": s}) for k, s in
+             zip(("Open", "High", "Low", "Close", "Volume"), (o, h, l, c, v))}
+    fake = [
+        lambda *a, **k: {"pattern": "雙重底", "pivot": 90.0, "status": "已突破", "score": 90,
+                         "structure_date": "2026-08-01"},
+        lambda *a, **k: {"pattern": "作弊型態", "pivot": 95.0, "status": "整理中", "score": 40,
+                         "structure_date": "2026-09-03"},
+        lambda *a, **k: None,
+    ]
+    monkeypatch.setattr(pattern_screener, "DETECTORS", fake)
+    hits = screen_one("1111.TW", ohlcv, {"代號": "1111"})
+    assert len(hits) == 1
+    assert hits[0]["pattern"] == "作弊型態" and hits[0]["primary"] is True
+
+
 def test_mark_primary_prefers_newest_structure():
     hits = [
         {"pattern": "雙重底", "status": "已延伸", "score": 90, "structure_date": "2026-05-01"},
         {"pattern": "VCP", "status": "即將突破", "score": 70, "structure_date": "2026-09-03"},
-        {"pattern": "杯狀帶柄", "status": "已突破", "score": 80, "structure_date": "2026-09-03"},
+        {"pattern": "作弊型態", "status": "已突破", "score": 80, "structure_date": "2026-09-03"},
     ]
     mark_primary(hits)
     prim = [h["pattern"] for h in hits if h["primary"]]
@@ -304,6 +390,32 @@ def test_export_drops_extended_rows(tmp_path):
     with open(tmp_path / "app" / "patterns.json") as f:
         rows = json.load(f)
     assert [r["status"] for r in rows] == ["即將突破"]
+
+    # 一檔一筆:即使輸入含同檔多筆,也只輸出 primary 那一筆,且沒有 others
+    patterns2 = [
+        {**base, "pattern": "高聳旗形", "pattern_label": "高聳旗形", "pivot": 100.0,
+         "dist_pivot_pct": -4.0, "status": "即將突破", "primary": True, "structure_date": "2026-09-04"},
+        {**base, "pattern": "作弊型態", "pattern_label": "作弊型態", "pivot": 104.0,
+         "dist_pivot_pct": -7.8, "status": "整理中", "primary": False, "structure_date": "2026-09-03"},
+    ]
+    export_app_json(ranking, patterns2, ohlcv, fresh, outdir=str(tmp_path / "app2"))
+    with open(tmp_path / "app2" / "patterns.json") as f:
+        rows = json.load(f)
+    assert len(rows) == 1
+    assert rows[0]["pattern"] == "高聳旗形" and rows[0]["status"] == "即將突破"
+    assert "others" not in rows[0]
+
+    # 主要型態已延伸 → 整檔不出現(不讓舊的次要型態頂替)
+    patterns3 = [
+        {**base, "pattern": "VCP", "pattern_label": "VCP", "pivot": 90.0,
+         "dist_pivot_pct": 11.0, "status": "已延伸", "primary": True, "structure_date": "2026-09-04"},
+        {**base, "pattern": "雙重底", "pattern_label": "雙重底", "pivot": 104.0,
+         "dist_pivot_pct": -3.8, "status": "整理中", "primary": False, "structure_date": "2026-08-01"},
+    ]
+    export_app_json(ranking, patterns3, ohlcv, fresh, outdir=str(tmp_path / "app3"))
+    with open(tmp_path / "app3" / "patterns.json") as f:
+        rows = json.load(f)
+    assert rows == []
 
 
 # ---------------------------------------------------------------- breakout tracker
