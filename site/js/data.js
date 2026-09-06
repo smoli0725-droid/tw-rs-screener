@@ -1,5 +1,5 @@
 window.RS_DATA = (() => {
-  let cache = { meta: null, rs85: [], patterns: [], priceMap: {} };
+  let cache = { meta: null, rs85: [], patterns: [], priceMap: {}, breakouts: null };
 
   async function fetchJson(url) {
     const res = await fetch(url, { cache: 'no-store' });
@@ -7,12 +7,21 @@ window.RS_DATA = (() => {
     return res.json();
   }
 
+  async function fetchOptional(url) {
+    try {
+      return await fetchJson(url);
+    } catch {
+      return null;
+    }
+  }
+
   async function loadAll(baseUrl) {
     const base = baseUrl.replace(/\/$/, '');
-    const [meta, rs85, patterns] = await Promise.all([
+    const [meta, rs85, patterns, breakouts] = await Promise.all([
       fetchJson(`${base}/meta.json`),
       fetchJson(`${base}/rs85.json`),
       fetchJson(`${base}/patterns.json`),
+      fetchOptional(`${base}/breakouts.json`),
     ]);
     const priceMap = {};
     for (const s of rs85) priceMap[String(s.id)] = Number(s.close);
@@ -20,7 +29,7 @@ window.RS_DATA = (() => {
       const id = String(p.id);
       if (priceMap[id] == null) priceMap[id] = Number(p.close);
     }
-    cache = { meta, rs85, patterns, priceMap };
+    cache = { meta, rs85, patterns, priceMap, breakouts };
     return cache;
   }
 

@@ -7,13 +7,25 @@
     rs85: [],
     patterns: [],
     priceMap: {},
+    breakouts: null,
     market: '',
     templateOnly: false,
     rsQuery: '',
-    statuses: new Set(['即將突破']),
+    statuses: new Set(['即將突破', '已突破']),
     patternTypes: new Set(),
+    tradeStatuses: new Set(['active', 'success', 'failed', 'recovered']),
     chartContext: null,
   };
+
+  const STATUS_CLASS = { 即將突破: 'hot', 已突破: 'ok', 整理中: 'warn', 已延伸: 'ext' };
+  const TRADE_LABEL = {
+    active: '進行中',
+    success: '成功',
+    failed: '失敗',
+    recovered: '復甦',
+    reentered: '再突破',
+  };
+  const TRADE_CLASS = { active: 'warn', success: 'ok', failed: 'hot', recovered: 'hot', reentered: 'muted' };
 
   const fmt = {
     money: (n) =>
@@ -52,11 +64,14 @@
       state.rs85 = data.rs85;
       state.patterns = data.patterns;
       state.priceMap = data.priceMap;
+      state.breakouts = data.breakouts;
       renderMeta();
+      renderMarket();
       renderPortfolio();
       buildPatternChips();
       renderRs85();
       renderPatterns();
+      renderTrades();
     } catch (e) {
       console.error(e);
       $('#metaLine').textContent = `載入失敗：${e.message}`;
@@ -67,9 +82,34 @@
   function renderMeta() {
     const m = state.meta || {};
     const c = m.counts || {};
+    const mk = m.market;
+    const rate = mk && mk.win_rate != null ? ` · 勝率 ${Math.round(mk.win_rate * 100)}%` : '';
     $('#metaLine').textContent =
-      `資料 ${m.data_date || '—'} · RS85 ${c.rs85 ?? '—'} · 型態 ${c.patterns ?? '—'} · 即將突破 ${c.near_breakout ?? '—'}` +
+      `資料 ${m.data_date || '—'} · RS85 ${c.rs85 ?? '—'} · 型態 ${c.pattern_symbols ?? c.patterns ?? '—'} 檔 · 即將突破 ${
+        c.near_breakout ?? '—'
+      } · 可買 ${c.broke_out ?? '—'}${rate}` +
       (m.message ? ` · ${m.message}` : m.is_fresh === false ? ' · 資料可能未更新' : '');
+  }
+
+  function renderMarket() {
+    const card = $('#marketCard');
+    const mk = (state.breakouts && state.breakouts.market) || (state.meta && state.meta.market);
+    if (!mk) {
+      card.innerHTML =
+        '<div class="market-body"><div class="market-title">市況指標</div><div class="item-sub">尚無突破追蹤資料，每日更新後累積。</div></div>';
+      return;
+    }
+    const pct = mk.win_rate == null ? null : Math.round(mk.win_rate * 100);
+    const cls = pct == null ? '' : pct >= 60 ? 'good' : pct >= 50 ? 'neutral' : 'bad';
+    card.innerHTML = `
+      <div class="market-rate ${cls}">${pct == null ? '—' : pct + '%'}</div>
+      <div class="market-body">
+        <div class="market-title">${esc(mk.label || '市況')}<span class="badge muted">近 ${mk.window_days || 10} 個交易日</span></div>
+        <div class="item-sub">${mk.wins ?? 0} 勝 ${mk.losses ?? 0} 敗 · 進行中 ${mk.pending ?? 0}${
+          mk.recovered ? ` · 復甦 ${mk.recovered}` : ''
+        }${mk.window_start ? ` · 自 ${mk.window_start}` : ''}</div>
+        <div class="market-bar"><span style="width:${pct == null ? 0 : pct}%"></span></div>
+      </div>`;
   }
 
   function renderPortfolio() {
@@ -155,39 +195,107 @@
       .join('');
   }
 
+  function fmtDist(v) {
+    return v == null ? '—' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)}%`;
+  }
+
   function renderPatterns() {
     let rows = state.patterns;
     if (state.statuses.size) rows = rows.filter((r) => state.statuses.has(r.status));
     if (state.patternTypes.size) rows = rows.filter((r) => state.patternTypes.has(r.pattern));
-    $('#patternCount').textContent = `${rows.length} 筆`;
+
+    // 同一檔多型態:主要型態當卡片,其餘列為「另符合」
+    const groups = new Map();
+    for (const r of rows) {
+      const g = groups.get(r.id) || { main: null, others: [] };
+      if (r.primary !== false && !g.main) g.main = r;
+      else g.others.push(r);
+      groups.set(r.id, g);
+    }
+    const cards = [...groups.values()].map((g) => {
+      if (!g.main) {
+        g.main = g.others.shift();
+        g.secondaryOnly = true;
+      }
+      return g;
+    });
+    $('#patternCount').textContent = `${cards.length} 檔 · ${rows.length} 筆型態`;
     const list = $('#patternList');
-    if (!rows.length) {
+    if (!cards.length) {
       list.innerHTML = '<div class="empty">沒有符合的型態</div>';
       return;
     }
-    list.innerHTML = rows
-      .map((r) => {
-        const cls = r.status === '即將突破' ? 'hot' : r.status === '已突破' ? 'ok' : 'warn';
-        const dist =
-          r.dist_pivot_pct == null
-            ? '—'
-            : `${r.dist_pivot_pct > 0 ? '+' : ''}${Number(r.dist_pivot_pct).toFixed(2)}%`;
+    list.innerHTML = cards
+      .map(({ main: r, others, secondaryOnly }) => {
+        const cls = STATUS_CLASS[r.status] || 'warn';
+        const bo = r.breakout_date
+          ? ` · 突破 ${String(r.breakout_date).slice(5)}${
+              r.days_since_breakout != null ? `（${r.days_since_breakout} 日前）` : ''
+            }`
+          : '';
+        const extra = others.length
+          ? `<div class="item-extra">另符合：${others
+              .map((o) => `${esc(o.pattern)} 樞紐 ${fmt.money(o.pivot)}（${esc(o.status)}）`)
+              .join(' · ')}</div>`
+          : '';
         return `<article class="item" data-open-chart="${r.id}" data-name="${esc(r.name)}" data-market="${esc(
           r.market
         )}" data-pivot="${r.pivot ?? ''}">
           <div>
-            <div class="item-title">${r.id} ${esc(r.name)}<span class="badge ${cls}">${esc(
-              r.status
-            )}</span></div>
+            <div class="item-title">${r.id} ${esc(r.name)}<span class="badge ${cls}">${esc(r.status)}</span>${
+          r.recovered ? '<span class="badge hot">復甦</span>' : ''
+        }${secondaryOnly ? '<span class="badge muted">次要型態</span>' : ''}</div>
             <div class="item-sub">${esc(r.pattern_label || r.pattern)} · RS ${r.rs} · ${fmt.money(r.close)}<br/>
-樞紐 ${fmt.money(r.pivot)}（${dist}）<br/>
-${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.base_weeks + '週' : ''}${
-          r.vol_dry_ratio != null ? ' · 量縮 ' + r.vol_dry_ratio : ''
-        }</div>
+樞紐 ${fmt.money(r.pivot)}（${fmtDist(r.dist_pivot_pct)}）${bo}<br/>
+${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.base_weeks + '週 · ' : ''}${
+          r.structure_date ? '結構 ' + String(r.structure_date).slice(5) : ''
+        }${r.vol_dry_ratio != null ? ' · 量縮 ' + r.vol_dry_ratio : ''}</div>
+            ${extra}
           </div>
           <div class="item-right"><div><strong>${
             r.score != null ? Number(r.score).toFixed(0) : ''
           }</strong></div><div class="item-sub">分數</div></div>
+        </article>`;
+      })
+      .join('');
+  }
+
+  function renderTrades() {
+    const list = $('#tradeList');
+    const b = state.breakouts;
+    const trades = (b && b.trades) || [];
+    let rows = trades;
+    if (state.tradeStatuses.size) rows = rows.filter((t) => state.tradeStatuses.has(t.status));
+    $('#tradeCount').textContent = `${rows.length} 筆（共 ${trades.length}）`;
+    if (!rows.length) {
+      list.innerHTML = `<div class="empty">${
+        trades.length ? '沒有符合的交易' : '尚無突破交易紀錄；每日更新後會自動累積'
+      }</div>`;
+      return;
+    }
+    list.innerHTML = rows
+      .map((t) => {
+        const label = TRADE_LABEL[t.status] || t.status;
+        const cls = TRADE_CLASS[t.status] || 'muted';
+        const last = t.last_close != null && t.pivot ? (t.last_close / t.pivot - 1) * 100 : null;
+        const outcome =
+          t.outcome_date
+            ? `${t.outcome === 'success' ? '達 +10%' : '跌破 −5%'} ${String(t.outcome_date).slice(5)}（${fmtDist(
+                t.outcome_pct
+              )}）`
+            : `現價 ${fmt.money(t.last_close)}（${fmtDist(last)}）`;
+        return `<article class="item" data-open-chart="${t.id}" data-name="${esc(t.name)}" data-market="${esc(
+          t.market || ''
+        )}" data-pivot="${t.pivot ?? ''}">
+          <div>
+            <div class="item-title">${t.id} ${esc(t.name || '')}<span class="badge ${cls}">${esc(label)}</span>${
+          t.origin === 'recovered' ? '<span class="badge muted">復甦後再突破</span>' : ''
+        }</div>
+            <div class="item-sub">${esc(t.pattern_label || t.pattern || '')} · 樞紐 ${fmt.money(t.pivot)} · 突破 ${String(
+          t.breakout_date || ''
+        ).slice(5)} @ ${fmt.money(t.breakout_close)}<br/>${outcome}</div>
+          </div>
+          <div class="item-right"><div class="${fmt.pnlClass(last || 0)}"><strong>${fmtDist(last)}</strong></div><div class="item-sub">距樞紐</div></div>
         </article>`;
       })
       .join('');
@@ -267,6 +375,15 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     else state.patternTypes.add(p);
     chip.classList.toggle('active');
     renderPatterns();
+  });
+  $('#tradeChips').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    const s = chip.dataset.trade;
+    if (state.tradeStatuses.has(s)) state.tradeStatuses.delete(s);
+    else state.tradeStatuses.add(s);
+    chip.classList.toggle('active');
+    renderTrades();
   });
 
   // portfolio

@@ -29,9 +29,12 @@ window.RS_CHART = (() => {
     const plotH = cssH - padT - padB;
     let minY = Math.min(...candles.map((c) => Number(c.low)));
     let maxY = Math.max(...candles.map((c) => Number(c.high)));
-    if (pivot != null && !Number.isNaN(Number(pivot))) {
-      minY = Math.min(minY, Number(pivot));
-      maxY = Math.max(maxY, Number(pivot));
+    const pv = pivot != null && !Number.isNaN(Number(pivot)) ? Number(pivot) : null;
+    // 樞紐離價格區間太遠(舊結構)時不拉伸 Y 軸,改在邊緣標註
+    const pivotInRange = pv != null && pv >= minY * 0.85 && pv <= maxY * 1.15;
+    if (pivotInRange) {
+      minY = Math.min(minY, pv);
+      maxY = Math.max(maxY, pv);
     }
     const span = maxY - minY || 1;
     minY -= span * 0.05;
@@ -91,18 +94,24 @@ window.RS_CHART = (() => {
       ctx.fillRect(x - candleW / 2, y1, candleW, Math.max(1, y2 - y1));
     });
 
-    if (pivot != null && !Number.isNaN(Number(pivot))) {
-      const y = yAt(Number(pivot));
+    if (pv != null) {
       ctx.save();
-      ctx.strokeStyle = '#ff8a80';
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.moveTo(padL, y);
-      ctx.lineTo(cssW - padR, y);
-      ctx.stroke();
       ctx.fillStyle = '#ff8a80';
       ctx.font = '11px sans-serif';
-      ctx.fillText(`pivot ${pivot}`, padL + 4, y - 6);
+      if (pivotInRange) {
+        const y = yAt(pv);
+        ctx.strokeStyle = '#ff8a80';
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(cssW - padR, y);
+        ctx.stroke();
+        ctx.fillText(`pivot ${pv}`, padL + 4, y - 6);
+      } else {
+        const above = pv > maxY;
+        const y = above ? padT + 12 : padT + plotH - 6;
+        ctx.fillText(`pivot ${pv}（${above ? '高於' : '低於'}圖表範圍）`, padL + 4, y);
+      }
       ctx.restore();
     }
 

@@ -77,6 +77,18 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 20px; }
 .badge.hot { background: #fde8e8; color: var(--up); }
 .badge.ok { background: #e7f6ea; color: var(--down); }
 .badge.warn { background: #fff1d6; color: var(--warn); }
+.badge.ext { background: #e6e9ef; color: #556070; }
+.badge.muted { background: #eef1f0; color: var(--muted); font-weight: 500; }
+.market-card { margin-bottom: 12px; display: flex; align-items: center; gap: 14px; }
+.market-rate { font-size: 1.9rem; font-weight: 700; line-height: 1; min-width: 92px; }
+.market-rate.good { color: var(--down); }
+.market-rate.neutral { color: var(--warn); }
+.market-rate.bad { color: var(--up); }
+.market-body { flex: 1; }
+.market-title { font-weight: 700; }
+.market-bar { height: 6px; border-radius: 999px; background: #e6e9ef; overflow: hidden; margin-top: 8px; }
+.market-bar > span { display: block; height: 100%; background: var(--accent); }
+.item-extra { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
 .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
 .tab {
   flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 12px;
