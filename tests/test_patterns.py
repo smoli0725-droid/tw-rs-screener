@@ -263,15 +263,47 @@ def test_detect_double_bottom():
     assert hit["pivot"] > 0
 
 
-def test_mark_primary_prefers_status_then_score():
+def test_mark_primary_prefers_newest_structure():
     hits = [
-        {"pattern": "雙重底", "status": "已延伸", "score": 90},
-        {"pattern": "VCP", "status": "即將突破", "score": 70},
-        {"pattern": "杯狀帶柄", "status": "即將突破", "score": 80},
+        {"pattern": "雙重底", "status": "已延伸", "score": 90, "structure_date": "2026-05-01"},
+        {"pattern": "VCP", "status": "即將突破", "score": 70, "structure_date": "2026-09-03"},
+        {"pattern": "杯狀帶柄", "status": "已突破", "score": 80, "structure_date": "2026-09-03"},
     ]
     mark_primary(hits)
     prim = [h["pattern"] for h in hits if h["primary"]]
-    assert prim == ["杯狀帶柄"]
+    # 最新結構同日 → 狀態優先(即將突破 > 已突破)
+    assert prim == ["VCP"]
+    hits2 = [
+        {"pattern": "雙重底", "status": "已突破", "score": 60, "structure_date": "2026-09-04"},
+        {"pattern": "高聳旗形", "status": "即將突破", "score": 99, "structure_date": "2026-08-01"},
+    ]
+    mark_primary(hits2)
+    assert [h["pattern"] for h in hits2 if h["primary"]] == ["雙重底"]
+
+
+def test_export_drops_extended_rows(tmp_path):
+    ohlcv, close, volume, twii, uni = make_synthetic()
+    result = compute_rs(close)
+    template = compute_template(close[result.index.tolist()], volume, twii, result["RS"])
+    ranking = export(result, template, uni, data_date=close.index[-1].date(),
+                     outdir=str(tmp_path / "o"))
+    row = ranking.iloc[0]
+    yf = [c for c in ohlcv["Close"].columns if str(c).startswith(str(row["代號"]))][0]
+    base = {"代號": str(row["代號"]), "名稱": row["名稱"], "市場": "上市", "產業": "測試",
+            "RS": int(row["RS"]), "收盤價": 100.0, "通過樣板": "✔", "距50MA%": 1.0,
+            "yf_ticker": yf, "score": 50, "annotations": [], "detail": {}}
+    patterns = [
+        {**base, "pattern": "VCP", "pattern_label": "VCP", "pivot": 100.0, "dist_pivot_pct": -2.0,
+         "status": "即將突破", "primary": True},
+        {**base, "pattern": "雙重底", "pattern_label": "雙重底", "pivot": 80.0, "dist_pivot_pct": 25.0,
+         "status": "已延伸", "primary": False},
+    ]
+    fresh = {"data_date": "2026-09-04", "is_fresh": True, "is_trading_day": True,
+             "source_checked_at": "x", "message": "ok", "twse_cross_check": None}
+    export_app_json(ranking, patterns, ohlcv, fresh, outdir=str(tmp_path / "app"))
+    with open(tmp_path / "app" / "patterns.json") as f:
+        rows = json.load(f)
+    assert [r["status"] for r in rows] == ["即將突破"]
 
 
 # ---------------------------------------------------------------- breakout tracker

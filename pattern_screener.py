@@ -23,7 +23,7 @@ import pandas as pd
 
 STATUS_NEAR = "即將突破"      # 收盤在 pivot 下方 0~5% 且量縮
 STATUS_BROKE = "已突破"       # 近期突破且收盤在 pivot 上方 0~5%(可買池)
-STATUS_EXTENDED = "已延伸"    # 收盤高於 pivot 5% 以上,或突破已超過時效
+STATUS_EXTENDED = "已延伸"    # 收盤高於 pivot 5% 以上,或突破已超過時效(不進型態清單,只供交易帳本)
 STATUS_BASE = "整理中"
 
 
@@ -94,6 +94,14 @@ STATUS_ORDER = {STATUS_NEAR: 0, STATUS_BROKE: 1, STATUS_BASE: 2, STATUS_EXTENDED
 
 
 # ---------------------------------------------------------------- zigzag
+def _date_ord(s: str) -> int:
+    """'YYYY-MM-DD' → 可排序整數;無法解析回 0。"""
+    try:
+        return int(str(s)[:10].replace("-", ""))
+    except ValueError:
+        return 0
+
+
 def _bar_date(index, i) -> str:
     ts = index[i]
     return str(ts.date()) if hasattr(ts, "date") else str(ts)[:10]
@@ -717,10 +725,14 @@ def screen_one(ticker: str, ohlcv: dict, meta: dict,
 
 
 def mark_primary(hits: list[dict]) -> list[dict]:
-    """同一檔多型態時,選一個「主要 pivot」:狀態優先,再看分數。"""
+    """同一檔多型態時,選一個「主要 pivot」:以最新結構為準,再看狀態與分數。"""
     if not hits:
         return hits
-    ranked = sorted(hits, key=lambda x: (STATUS_ORDER.get(x.get("status"), 9), -(x.get("score") or 0)))
+    ranked = sorted(hits, key=lambda x: (
+        -_date_ord(x.get("structure_date") or ""),
+        STATUS_ORDER.get(x.get("status"), 9),
+        -(x.get("score") or 0),
+    ))
     primary = ranked[0]
     for hit in hits:
         hit["primary"] = hit is primary
