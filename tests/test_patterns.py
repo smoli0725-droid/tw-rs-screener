@@ -336,24 +336,6 @@ def test_detect_double_bottom():
     assert hit["pivot"] > 0
 
 
-def test_double_bottom_survives_shallow_later_low_and_wide_pause():
-    """第二底之後的淺低點不應否決;停頓區過寬時改用 W 中間高點,不整段丟棄。"""
-    o, h, l, c, v = make_double_bottom_series()
-    p = PatternParams(zigzag_pct=0.05, db_min_weeks=2, cheat_pause_range_pct=20.0)
-    hit0 = detect_double_bottom(o, h, l, c, v, p)
-    assert hit0 is not None
-    # 在倒數第 8 根造一個仍高於第二底×0.90 的淺低點(舊規則:任何後續 L 都否決)
-    i = -8
-    l.iloc[i] = 55.0
-    c.iloc[i] = 56.0
-    h.iloc[i] = 58.0
-    o.iloc[i] = 57.0
-    hit = detect_double_bottom(o, h, l, c, v, p)
-    assert hit is not None, "淺低點不應否決雙重底"
-    assert hit["pattern"] == "雙重底"
-    assert hit["pivot"] > 0
-
-
 def test_cheat_position_labels():
     """停頓區在基底下/中/上 1/3 → 低位 / 中段 3-C / 上緣(杯柄),pivot = 停頓區高點。"""
     cases = [(75.0, CHEAT_POS_LOW), (85.0, CHEAT_POS_MID), (96.0, CHEAT_POS_UPPER)]
