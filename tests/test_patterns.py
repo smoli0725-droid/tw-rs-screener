@@ -36,6 +36,7 @@ from breakout_tracker import (
     update_ledger,
     market_stats,
     recovered_candidates,
+    recent_trades,
     TRADE_ACTIVE,
     TRADE_SUCCESS,
     TRADE_FAILED,
@@ -547,6 +548,25 @@ def test_market_stats_window_by_outcome_date():
     m = market_stats(ledger, df, dates[-1])
     assert m["wins"] == 1 and m["losses"] == 1 and m["pending"] == 1
     assert m["win_rate"] == 0.5 and m["label"] == "市況中性"
+
+
+def test_recent_trades_hides_old_outcomes():
+    """成功／失敗超出市況視窗不出現在前端清單;進行中仍出現。"""
+    ledger = empty_ledger()
+    df = _close_df([100.0] * 30)
+    dates = [x.date().isoformat() for x in df.index]
+    ledger["trades"] = [
+        {"id": "a", "status": TRADE_SUCCESS, "outcome": TRADE_SUCCESS, "outcome_date": dates[-1],
+         "breakout_date": dates[-2]},
+        {"id": "b", "status": TRADE_FAILED, "outcome": TRADE_FAILED, "outcome_date": dates[-20],
+         "breakout_date": dates[-22]},
+        {"id": "c", "status": TRADE_ACTIVE, "outcome": None, "outcome_date": None,
+         "breakout_date": dates[-15]},
+    ]
+    rows = recent_trades(ledger, df, dates[-1])
+    ids = [r["id"] for r in rows]
+    assert "a" in ids and "c" in ids
+    assert "b" not in ids
 
 
 def test_is_likely_trading_day():

@@ -264,11 +264,12 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
     market = (ledger or {}).get("market")
     if ledger is not None:
         from breakout_tracker import recent_trades
+        close_df = ohlcv.get("Close") if isinstance(ohlcv, dict) else None
         breakouts = {
             "as_of": freshness.get("data_date"),
             "market": market,
             "history": ledger.get("history", [])[-60:],
-            "trades": recent_trades(ledger),
+            "trades": recent_trades(ledger, close_df, freshness.get("data_date")),
         }
         with open(os.path.join(outdir, "breakouts.json"), "w", encoding="utf-8") as f:
             json.dump(_json_safe(breakouts), f, ensure_ascii=False)
