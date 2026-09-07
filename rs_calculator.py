@@ -132,6 +132,40 @@ def _parse_twse_price(val) -> float | None:
         return None
 
 
+def _parse_twse_date(val) -> dt.date | None:
+    """TWSE OpenAPI Date: 民國年(1150904=2026-09-04),也接受西元 8 碼。"""
+    if val is None:
+        return None
+    try:
+        if isinstance(val, float) and np.isnan(val):
+            return None
+    except TypeError:
+        pass
+    s = str(val).strip().replace("/", "").replace("-", "")
+    if not s.isdigit():
+        return None
+    try:
+        if len(s) == 7:      # 1150904
+            y, m, d = int(s[:3]) + 1911, int(s[3:5]), int(s[5:7])
+        elif len(s) == 8:    # 20260907
+            y, m, d = int(s[:4]), int(s[4:6]), int(s[6:8])
+        elif len(s) == 6:    # 990904
+            y, m, d = int(s[:2]) + 1911, int(s[2:4]), int(s[4:6])
+        else:
+            return None
+        return dt.date(y, m, d)
+    except ValueError:
+        return None
+
+
+def _twse_snapshot_date(twse: pd.DataFrame) -> dt.date | None:
+    if twse is None or twse.empty or "Date" not in twse.columns:
+        return None
+    parsed = [_parse_twse_date(v) for v in twse["Date"].dropna().unique()]
+    parsed = [p for p in parsed if p is not None]
+    return max(parsed) if parsed else None
+
+
 def is_likely_trading_day(today: dt.date | None = None) -> bool:
     """粗判今天是否為台股交易日(週一到週五;假日另用 TWSE 資料確認)。"""
     today = today or dt.date.today()
@@ -165,6 +199,23 @@ def check_freshness(close: pd.DataFrame, twii: pd.Series,
         # 交叉驗證:抽樣比對 TWSE 收盤價與 Yahoo
         twse = fetch_twse_day_all()
         if twse is not None:
+            twse_date = _twse_snapshot_date(twse)
+            # STOCK_DAY_ALL 常晚於 Yahoo 才換成當日檔。若拿前一交易日收盤
+            # 去對 Yahoo 當日價,大漲股會被誤判成「資料未更新」
+            # (例:2026-09-07 2454 Yahoo 4760 vs TWSE 9/4 快照 4415)。
+            if twse_date is not None and twse_date < data_date:
+                result["twse_cross_check"] = {
+                    "ok": True,
+                    "skipped": True,
+                    "reason": "twse_stale",
+                    "twse_date": twse_date.isoformat(),
+                    "mismatches": [],
+                }
+                result["message"] = (
+                    f"fresh（TWSE 快照 {twse_date} 尚未更新,略過交叉比價）"
+                )
+                return result
+
             mismatches = []
             for sid in FRESHNESS_SAMPLE_IDS:
                 row = twse[twse["Code"] == sid]
@@ -179,6 +230,7 @@ def check_freshness(close: pd.DataFrame, twii: pd.Series,
                     mismatches.append({"id": sid, "twse": twse_px, "yahoo": yf_px})
             result["twse_cross_check"] = {
                 "ok": len(mismatches) == 0,
+                "twse_date": twse_date.isoformat() if twse_date else None,
                 "mismatches": mismatches,
             }
             if mismatches:
