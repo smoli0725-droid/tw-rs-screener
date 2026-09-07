@@ -49,6 +49,7 @@ from rs_calculator import (
     export,
     make_synthetic,
     is_likely_trading_day,
+    _parse_twse_date,
 )
 
 
@@ -569,6 +570,98 @@ def test_check_freshness_skip():
     twii = pd.Series(range(10), index=dates)
     r = check_freshness(close, twii, skip=True)
     assert r["message"] == "skipped"
+
+
+def test_parse_twse_date():
+    assert _parse_twse_date("1150904") == dt.date(2026, 9, 4)
+    assert _parse_twse_date("1150907") == dt.date(2026, 9, 7)
+    assert _parse_twse_date("20260907") == dt.date(2026, 9, 7)
+    assert _parse_twse_date("990101") == dt.date(2010, 1, 1)
+    assert _parse_twse_date(None) is None
+    assert _parse_twse_date("not-a-date") is None
+
+
+def _twse_day_all(date_roc: str, prices: dict[str, str]) -> pd.DataFrame:
+    return pd.DataFrame({
+        "Date": [date_roc] * len(prices),
+        "Code": list(prices),
+        "ClosingPrice": list(prices.values()),
+    })
+
+
+def test_check_freshness_skips_stale_twse_snapshot(monkeypatch):
+    """Yahoo 已是當日、TWSE OpenAPI 仍是前一交易日 → 不可因大漲股比價失敗。
+
+    真實事故:2026-09-07 聯發科 Yahoo 4760 vs TWSE 9/4 快照 4415,Actions 誤判未更新。
+    """
+    today = dt.date(2026, 9, 7)
+    dates = _dates(3, end=today)
+    close = pd.DataFrame({
+        "2330.TW": [2410.0, 2410.0, 2460.0],
+        "2317.TW": [256.0, 256.0, 260.0],
+        "2454.TW": [4415.0, 4415.0, 4760.0],
+    }, index=dates)
+    twii = pd.Series([46500.0, 46551.0, 47326.0], index=dates)
+    twse = _twse_day_all("1150904", {
+        "2330": "2410.00",
+        "2317": "256.00",
+        "2454": "4415.00",
+    })
+    monkeypatch.setattr("rs_calculator.fetch_twse_day_all", lambda: twse)
+
+    r = check_freshness(close, twii, today=today, skip=False)
+    assert r["is_fresh"] is True
+    assert r["data_date"] == "2026-09-07"
+    assert r["twse_cross_check"]["skipped"] is True
+    assert r["twse_cross_check"]["twse_date"] == "2026-09-04"
+    assert r["twse_cross_check"]["mismatches"] == []
+
+
+def test_check_freshness_same_date_price_mismatch(monkeypatch):
+    """TWSE 已是當日檔且抽樣價差 >3% → 仍應判定 Yahoo 不可用。"""
+    today = dt.date(2026, 9, 7)
+    dates = _dates(2, end=today)
+    close = pd.DataFrame({
+        "2330.TW": [2410.0, 2460.0],
+        "2317.TW": [256.0, 260.0],
+        "2454.TW": [4415.0, 4760.0],
+    }, index=dates)
+    twii = pd.Series([46551.0, 47326.0], index=dates)
+    twse = _twse_day_all("1150907", {
+        "2330": "2410.00",  # 與 Yahoo 差 2.07% → 通過 3% 門檻
+        "2317": "256.00",
+        "2454": "4415.00",  # 與 Yahoo 差 7.8% → 失敗
+    })
+    monkeypatch.setattr("rs_calculator.fetch_twse_day_all", lambda: twse)
+
+    r = check_freshness(close, twii, today=today, skip=False)
+    assert r["is_fresh"] is False
+    assert r["twse_cross_check"]["ok"] is False
+    assert r["twse_cross_check"]["twse_date"] == "2026-09-07"
+    assert any(m["id"] == "2454" for m in r["twse_cross_check"]["mismatches"])
+
+
+def test_check_freshness_same_date_prices_ok(monkeypatch):
+    today = dt.date(2026, 9, 7)
+    dates = _dates(2, end=today)
+    close = pd.DataFrame({
+        "2330.TW": [2410.0, 2460.0],
+        "2317.TW": [256.0, 260.0],
+        "2454.TW": [4415.0, 4760.0],
+    }, index=dates)
+    twii = pd.Series([46551.0, 47326.0], index=dates)
+    twse = _twse_day_all("1150907", {
+        "2330": "2460.00",
+        "2317": "260.00",
+        "2454": "4760.00",
+    })
+    monkeypatch.setattr("rs_calculator.fetch_twse_day_all", lambda: twse)
+
+    r = check_freshness(close, twii, today=today, skip=False)
+    assert r["is_fresh"] is True
+    assert r["message"] == "fresh"
+    assert r["twse_cross_check"]["ok"] is True
+    assert r["twse_cross_check"]["mismatches"] == []
 
 
 def test_full_pipeline_test_mode(tmp_path, monkeypatch):
