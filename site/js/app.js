@@ -183,8 +183,12 @@
       .join('');
   }
 
+  const ALL_PATTERNS = ['VCP', '作弊型態', '雙重底', '高聳旗形'];
+
   function buildPatternChips() {
-    const types = [...new Set(state.patterns.map((p) => p.pattern).filter(Boolean))].sort();
+    const present = new Set(state.patterns.map((p) => p.pattern).filter(Boolean));
+    const extra = [...present].filter((t) => !ALL_PATTERNS.includes(t)).sort();
+    const types = [...ALL_PATTERNS, ...extra];
     $('#patternChips').innerHTML = types
       .map(
         (t) =>
@@ -378,8 +382,10 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     form.date.value = new Date().toISOString().slice(0, 10);
     $('#tradeDialog').showModal();
   });
+  $('#cancelTradeBtn').addEventListener('click', () => {
+    $('#tradeDialog').close();
+  });
   $('#tradeForm').addEventListener('submit', (e) => {
-    if (e.submitter?.value !== 'save') return;
     e.preventDefault();
     const fd = new FormData($('#tradeForm'));
     const id = String(fd.get('id') || '').trim();

@@ -498,8 +498,9 @@ def detect_double_bottom(o, h, l, c, v, p: PatternParams = PARAMS) -> dict | Non
             continue
         if (n - 1 - l2["idx"]) > p.recent_bars * 2:
             continue
-        # 第二底之後不得再有已確認低點(否則已是新結構)
-        if any(x["idx"] > l2["idx"] for x in lows):
+        # 第二底之後若還有明顯更深的確認低點,W 已壞;淺的後續低點不否決
+        later_lows = [x for x in lows if x["idx"] > l2["idx"]]
+        if any(x["price"] < l2["price"] * p.db_second_floor for x in later_lows):
             continue
         mid_hs = [x for x in highs if l1["idx"] < x["idx"] < l2["idx"]]
         if not mid_hs:
@@ -507,13 +508,12 @@ def detect_double_bottom(o, h, l, c, v, p: PatternParams = PARAMS) -> dict | Non
         mid = max(mid_hs, key=lambda x: x["price"])
 
         pause = _pause_zone(h, l, c, v, l2["idx"], p)
-        if pause is None:
+        if pause is None or pause["range_pct"] > p.db_handle_range * 100:
+            # 停頓區過寬或不存在:仍以 W 中間高點為樞紐,不整段丟棄
             pivot = float(mid["price"])
             handle_info = None
             structure_idx = l2["idx"]
         else:
-            if pause["range_pct"] > p.db_handle_range * 100:
-                continue
             # 停頓區(柄)高點若已越過 W 中間高點,阻力仍以中間高點為準
             pivot = float(min(pause["high"], mid["price"]))
             handle_info = pause
