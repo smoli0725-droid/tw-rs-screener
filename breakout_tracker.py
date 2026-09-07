@@ -317,9 +317,27 @@ def recovered_candidates(ledger: dict) -> list[dict]:
     return [t for t in ledger.get("trades", []) if t.get("status") == TRADE_RECOVERED]
 
 
-def recent_trades(ledger: dict, limit: int = 80) -> list[dict]:
-    """給前端的近期交易(新到舊)。"""
-    trades = sorted(ledger.get("trades", []),
+def recent_trades(ledger: dict, close_df: pd.DataFrame | None = None,
+                  data_date: str | None = None, days: int = WINDOW_DAYS,
+                  limit: int = 80) -> list[dict]:
+    """給前端的近期交易(新到舊)。
+
+    成功／失敗只列判定日落在市況視窗(近 `days` 個交易日)內的;
+    進行中／復甦／再突破不裁。帳本本身不刪歷史。
+    """
+    trades = list(ledger.get("trades", []))
+    if close_df is not None and data_date:
+        win_dates = _window_dates(close_df, data_date, days)
+        keep = []
+        for t in trades:
+            st = t.get("status")
+            if st in (TRADE_SUCCESS, TRADE_FAILED):
+                if t.get("outcome_date") in win_dates:
+                    keep.append(t)
+            else:
+                keep.append(t)
+        trades = keep
+    trades = sorted(trades,
                     key=lambda t: (t.get("outcome_date") or t.get("last_date") or "", t.get("breakout_date") or ""),
                     reverse=True)
     keys = ("trade_id", "id", "name", "market", "pattern", "pattern_label", "rs", "pivot",
