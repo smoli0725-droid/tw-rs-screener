@@ -251,8 +251,8 @@
    "outcome_pct": -9.66,
    "peak_close": 88.0,
    "trough_close": 79.5,
-   "last_date": "2026-09-07",
-   "last_close": 79.5
+   "last_date": "2026-09-08",
+   "last_close": 77.0999984741211
   },
   {
    "trade_id": "3094-2026-08-28-39",
@@ -297,8 +297,8 @@
    "outcome_pct": null,
    "peak_close": 99.80000305175781,
    "trough_close": 95.30000305175781,
-   "last_date": "2026-09-07",
-   "last_close": 98.0
+   "last_date": "2026-09-08",
+   "last_close": 97.9000015258789
   },
   {
    "trade_id": "6870-2026-09-01-270",
@@ -342,9 +342,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 89.5999984741211,
-   "trough_close": 86.30000305175781,
-   "last_date": "2026-09-07",
-   "last_close": 87.69999694824219
+   "trough_close": 85.9000015258789,
+   "last_date": "2026-09-08",
+   "last_close": 85.9000015258789
   },
   {
    "trade_id": "7744-2026-09-02-513",
@@ -366,8 +366,31 @@
    "outcome_pct": null,
    "peak_close": 561.0,
    "trough_close": 521.0,
-   "last_date": "2026-09-07",
-   "last_close": 561.0
+   "last_date": "2026-09-08",
+   "last_close": 523.0
+  },
+  {
+   "trade_id": "2882-2026-09-03-112.5",
+   "id": "2882",
+   "name": "國泰金",
+   "market": "上市",
+   "pattern": "作弊型態",
+   "pattern_label": "作弊型態",
+   "yf_ticker": "2882.TW",
+   "rs": 88,
+   "pivot": 112.5,
+   "breakout_date": "2026-09-03",
+   "breakout_close": 112.5,
+   "origin": "pattern",
+   "status": "active",
+   "outcome": null,
+   "outcome_date": null,
+   "outcome_close": null,
+   "outcome_pct": null,
+   "peak_close": 115.0,
+   "trough_close": 112.5,
+   "last_date": "2026-09-08",
+   "last_close": 113.5
   },
   {
    "trade_id": "2885-2026-09-03-68.08",
@@ -387,10 +410,10 @@
    "outcome_date": null,
    "outcome_close": null,
    "outcome_pct": null,
-   "peak_close": 70.19999694824219,
+   "peak_close": 70.5999984741211,
    "trough_close": 68.5,
-   "last_date": "2026-09-07",
-   "last_close": 70.19999694824219
+   "last_date": "2026-09-08",
+   "last_close": 70.5999984741211
   },
   {
    "trade_id": "3231-2026-09-03-188",
@@ -411,9 +434,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 198.0,
-   "trough_close": 188.5,
-   "last_date": "2026-09-07",
-   "last_close": 197.0
+   "trough_close": 186.5,
+   "last_date": "2026-09-08",
+   "last_close": 186.5
   },
   {
    "trade_id": "2388-2026-09-04-78",
@@ -434,9 +457,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 81.4000015258789,
-   "trough_close": 77.69999694824219,
-   "last_date": "2026-09-07",
-   "last_close": 77.69999694824219
+   "trough_close": 76.0999984741211,
+   "last_date": "2026-09-08",
+   "last_close": 76.0999984741211
   },
   {
    "trade_id": "3406-2026-09-04-1055",
@@ -451,15 +474,15 @@
    "breakout_date": "2026-09-04",
    "breakout_close": 1055.0,
    "origin": "pattern",
-   "status": "failed",
+   "status": "recovered",
    "outcome": "failed",
    "outcome_date": "2026-09-07",
    "outcome_close": 987.0,
    "outcome_pct": -6.45,
    "peak_close": 1055.0,
    "trough_close": 987.0,
-   "last_date": "2026-09-07",
-   "last_close": 987.0
+   "last_date": "2026-09-08",
+   "last_close": 1010.0
   },
   {
    "trade_id": "3441-2026-09-04-139.5",
@@ -481,8 +504,8 @@
    "outcome_pct": -6.09,
    "peak_close": 143.0,
    "trough_close": 131.0,
-   "last_date": "2026-09-07",
-   "last_close": 131.0
+   "last_date": "2026-09-08",
+   "last_close": 132.0
   },
   {
    "trade_id": "3714-2026-09-04-64.4",
@@ -503,9 +526,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 67.19999694824219,
-   "trough_close": 66.80000305175781,
-   "last_date": "2026-09-07",
-   "last_close": 67.19999694824219
+   "trough_close": 64.9000015258789,
+   "last_date": "2026-09-08",
+   "last_close": 64.9000015258789
   },
   {
    "trade_id": "6224-2026-09-04-81.2",
@@ -526,9 +549,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 88.80000305175781,
-   "trough_close": 84.80000305175781,
-   "last_date": "2026-09-07",
-   "last_close": 88.80000305175781
+   "trough_close": 84.5999984741211,
+   "last_date": "2026-09-08",
+   "last_close": 84.5999984741211
   },
   {
    "trade_id": "2409-2026-09-07-27.15",
@@ -548,10 +571,10 @@
    "outcome_date": null,
    "outcome_close": null,
    "outcome_pct": null,
-   "peak_close": 28.700000762939453,
+   "peak_close": 29.600000381469727,
    "trough_close": 28.700000762939453,
-   "last_date": "2026-09-07",
-   "last_close": 28.700000762939453
+   "last_date": "2026-09-08",
+   "last_close": 29.600000381469727
   },
   {
    "trade_id": "2855-2026-09-07-51.2",
@@ -571,10 +594,10 @@
    "outcome_date": null,
    "outcome_close": null,
    "outcome_pct": null,
-   "peak_close": 52.0,
+   "peak_close": 52.20000076293945,
    "trough_close": 52.0,
-   "last_date": "2026-09-07",
-   "last_close": 52.0
+   "last_date": "2026-09-08",
+   "last_close": 52.20000076293945
   },
   {
    "trade_id": "6021-2026-09-07-40.35",
@@ -594,10 +617,10 @@
    "outcome_date": null,
    "outcome_close": null,
    "outcome_pct": null,
-   "peak_close": 40.849998474121094,
+   "peak_close": 42.5,
    "trough_close": 40.849998474121094,
-   "last_date": "2026-09-07",
-   "last_close": 40.849998474121094
+   "last_date": "2026-09-08",
+   "last_close": 42.5
   },
   {
    "trade_id": "6292-2026-09-07-63.9",
@@ -618,9 +641,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 65.80000305175781,
-   "trough_close": 65.80000305175781,
-   "last_date": "2026-09-07",
-   "last_close": 65.80000305175781
+   "trough_close": 65.69999694824219,
+   "last_date": "2026-09-08",
+   "last_close": 65.69999694824219
   }
  ],
  "history": [
@@ -639,18 +662,26 @@
    "pending": 12,
    "win_rate": 0.727,
    "label": "市況良好"
+  },
+  {
+   "date": "2026-09-08",
+   "wins": 6,
+   "losses": 3,
+   "pending": 13,
+   "win_rate": 0.667,
+   "label": "市況良好"
   }
  ],
- "updated": "2026-09-07",
+ "updated": "2026-09-08",
  "market": {
-  "as_of": "2026-09-07",
+  "as_of": "2026-09-08",
   "window_days": 10,
-  "window_start": "2026-08-25",
-  "wins": 8,
+  "window_start": "2026-08-26",
+  "wins": 6,
   "losses": 3,
-  "pending": 12,
-  "recovered": 0,
-  "win_rate": 0.727,
+  "pending": 13,
+  "recovered": 1,
+  "win_rate": 0.667,
   "label": "市況良好",
   "rules": {
    "buy_zone_pct": 5.0,
