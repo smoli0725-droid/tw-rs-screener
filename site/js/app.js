@@ -562,20 +562,29 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
       <p>平均報酬（持股）：<strong class="${fmt.pnlClass(m.avgOpenReturnPct || 0)}">${
         m.avgOpenReturnPct == null ? '—' : fmt.pct(m.avgOpenReturnPct)
       }</strong></p>
-      <h3>月績效</h3>
+      <h3>持倉浮動</h3>
+      <p>未實現損益：<strong class="${fmt.pnlClass(m.unrealizedPnl || 0)}">${
+        m.openCount ? fmt.money(m.unrealizedPnl) : '—'
+      }</strong></p>
+      <p>持倉成本：<strong>${m.openCount ? fmt.money(m.openCost) : '—'}</strong></p>
+      <p>浮動報酬：<strong class="${fmt.pnlClass(m.unrealizedReturnPct || 0)}">${
+        fmt.pct(m.unrealizedReturnPct)
+      }</strong></p>
+      <h3>月績效（已實現）</h3>
+      <p class="hint">每月報酬％＝該月已平倉損益 ÷ 該月賣出部位的買進成本，不含持倉浮動。</p>
       ${
         m.monthly.length
           ? `<div class="list">${m.monthly
               .slice()
               .reverse()
               .map(
-                (row) => `<div class="item"><div>${row.yearMonth}<div class="item-sub">報酬 ${fmt.pct(
-                  row.returnPct
-                )}</div></div>
+                (row) => `<div class="item"><div>${row.yearMonth}<div class="item-sub">已實現報酬 ${
+                  row.returnPct == null ? '—' : fmt.pct(row.returnPct)
+                }</div></div>
                 <div class="item-right ${fmt.pnlClass(row.pnl)}">${fmt.money(row.pnl)}</div></div>`
               )
               .join('')}</div>`
-          : '<p class="hint">尚無資料</p>'
+          : '<p class="hint">尚無已平倉資料</p>'
       }`;
     $('#metricsDialog').showModal();
   });

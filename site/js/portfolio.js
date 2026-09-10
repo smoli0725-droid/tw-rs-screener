@@ -1,10 +1,4 @@
 window.RS_PORTFOLIO = (() => {
-  function localMonthKey(d = new Date()) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    return `${y}-${m}`;
-  }
-
   function buildPositions(trades, priceMap = {}) {
     const lots = {};
     const sorted = [...trades].sort((a, b) => String(a.date).localeCompare(String(b.date)));
@@ -67,6 +61,7 @@ window.RS_PORTFOLIO = (() => {
             sellDate: t.date,
             returnPct: lot.price ? Number(t.price) / lot.price - 1 : 0,
             pnl: (Number(t.price) - lot.price) * matched,
+            cost: lot.price * matched,
           });
           lot.shares -= matched;
           remain -= matched;
@@ -91,18 +86,25 @@ window.RS_PORTFOLIO = (() => {
     const monthlyMap = {};
     for (const c of closed) {
       const key = String(c.sellDate).slice(0, 7);
-      monthlyMap[key] = (monthlyMap[key] || 0) + c.pnl;
+      const row = (monthlyMap[key] ??= { pnl: 0, cost: 0 });
+      row.pnl += c.pnl;
+      row.cost += c.cost;
     }
-    const nowKey = localMonthKey();
-    for (const p of positions) monthlyMap[nowKey] = (monthlyMap[nowKey] || 0) + p.pnl;
-    const costBase = positions.reduce((s, p) => s + p.costValue, 0) || 1;
     const monthly = Object.keys(monthlyMap)
       .sort()
-      .map((yearMonth) => ({
-        yearMonth,
-        pnl: monthlyMap[yearMonth],
-        returnPct: monthlyMap[yearMonth] / costBase,
-      }));
+      .map((yearMonth) => {
+        const { pnl, cost } = monthlyMap[yearMonth];
+        return {
+          yearMonth,
+          pnl,
+          cost,
+          returnPct: cost > 0 ? pnl / cost : null,
+        };
+      });
+
+    const unrealizedPnl = positions.reduce((s, p) => s + p.pnl, 0);
+    const openCost = positions.reduce((s, p) => s + p.costValue, 0);
+    const unrealizedReturnPct = openCost > 0 ? unrealizedPnl / openCost : null;
 
     return {
       winRate,
@@ -111,6 +113,9 @@ window.RS_PORTFOLIO = (() => {
       closedCount: closed.length,
       openCount: positions.length,
       monthly,
+      unrealizedPnl,
+      openCost,
+      unrealizedReturnPct,
     };
   }
 
