@@ -22,5 +22,31 @@ window.RS_STORAGE = (() => {
     saveTrades(trades);
     return trades;
   }
-  return { getDataBaseUrl, setDataBaseUrl, loadTrades, saveTrades, addTrade };
+  function addSell(trade) {
+    const trades = loadTrades();
+    trades.push({ id: crypto.randomUUID(), ...trade, side: 'sell' });
+    saveTrades(trades);
+    return trades;
+  }
+  function removeTrade(id) {
+    const trades = loadTrades().filter((t) => t.id !== id);
+    saveTrades(trades);
+    return trades;
+  }
+  function removeTradesBySymbol(symbol) {
+    const sid = String(symbol);
+    const trades = loadTrades().filter((t) => String(t.symbol) !== sid);
+    saveTrades(trades);
+    return trades;
+  }
+  return {
+    getDataBaseUrl,
+    setDataBaseUrl,
+    loadTrades,
+    saveTrades,
+    addTrade,
+    addSell,
+    removeTrade,
+    removeTradesBySymbol,
+  };
 })();

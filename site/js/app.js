@@ -140,6 +140,10 @@
           <div class="${fmt.pnlClass(p.returnPct)}">${fmt.pct(p.returnPct)}</div>
           <div class="item-sub ${fmt.pnlClass(p.pnl)}">${fmt.money(p.pnl)}</div>
         </div>
+        <div class="item-actions">
+          <button type="button" class="ghost-btn" data-sell="${p.symbol}">賣出</button>
+          <button type="button" class="ghost-btn" data-delete-pos="${p.symbol}" data-name="${esc(p.name)}">刪除</button>
+        </div>
       </article>`
       )
       .join('');
@@ -297,14 +301,17 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     $('#chartDialog').showModal();
     try {
       const raw = await RS_DATA.loadOhlcv(RS_STORAGE.getDataBaseUrl(), id);
-      const candles = (raw.candles || []).map((c) => ({
-        ...c,
-        ma50: c.ma50 ?? c.ma_50,
-        ma150: c.ma150 ?? c.ma_150,
-        ma200: c.ma200 ?? c.ma_200,
-      }));
-      RS_CHART.draw($('#chartCanvas'), { candles }, pivot !== '' && pivot != null ? Number(pivot) : null);
-      $('#chartLegend').textContent = '橘 MA50 · 紫 MA150 · 青 MA200 · 紅虛線樞紐';
+      const ohlcv = {
+        candles: (raw.candles || []).map((c) => ({
+          ...c,
+          ma50: c.ma50 ?? c.ma_50,
+          ma150: c.ma150 ?? c.ma_150,
+          ma200: c.ma200 ?? c.ma_200,
+        })),
+        annotations: raw.annotations || [],
+      };
+      RS_CHART.draw($('#chartCanvas'), ohlcv, pivot !== '' && pivot != null ? Number(pivot) : null);
+      $('#chartLegend').textContent = RS_CHART.legendText(ohlcv);
     } catch (e) {
       RS_CHART.draw($('#chartCanvas'), { candles: [] }, null);
       $('#chartLegend').textContent = `K 線載入失敗：${e.message}`;
@@ -411,6 +418,100 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     toast('已新增持股');
   });
 
+  let pendingDelete = null;
+
+  function openShares(symbol) {
+    const pos = RS_PORTFOLIO.buildPositions(RS_STORAGE.loadTrades(), state.priceMap).find(
+      (p) => String(p.symbol) === String(symbol)
+    );
+    return pos || null;
+  }
+
+  function openSellDialog(symbol) {
+    const pos = openShares(symbol);
+    if (!pos) {
+      toast('找不到持股');
+      return;
+    }
+    const form = $('#sellForm');
+    form.reset();
+    form.symbol.value = pos.symbol;
+    form.name.value = pos.name || pos.symbol;
+    form.market.value = pos.market || '上市';
+    form.shares.value = pos.shares;
+    form.shares.max = pos.shares;
+    form.price.value = pos.lastPrice != null ? pos.lastPrice : pos.cost;
+    form.date.value = new Date().toISOString().slice(0, 10);
+    $('#sellHint').textContent = `${pos.symbol} ${pos.name} · 目前持股 ${pos.shares} 股`;
+    $('#sellDialog').showModal();
+  }
+
+  $('#cancelSellBtn').addEventListener('click', () => $('#sellDialog').close());
+  $('#sellForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData($('#sellForm'));
+    const symbol = String(fd.get('symbol') || '').trim();
+    const price = Number(fd.get('price'));
+    const shares = Number(fd.get('shares'));
+    const pos = openShares(symbol);
+    if (!pos) {
+      toast('找不到持股');
+      return;
+    }
+    if (!(price > 0) || !(shares > 0)) {
+      toast('請確認賣出價／股數');
+      return;
+    }
+    if (shares > pos.shares) {
+      toast(`賣出股數不可超過目前持股 ${pos.shares}`);
+      return;
+    }
+    RS_STORAGE.addSell({
+      symbol,
+      name: String(fd.get('name') || pos.name || symbol).trim(),
+      market: String(fd.get('market') || pos.market || '上市'),
+      price,
+      shares,
+      date: String(fd.get('date')),
+    });
+    $('#sellDialog').close();
+    renderPortfolio();
+    toast(shares >= pos.shares ? '已全部賣出' : '已賣出');
+  });
+
+  function openDeleteDialog(symbol, name) {
+    pendingDelete = symbol;
+    $('#deleteHint').textContent = `確定刪除 ${symbol} ${name || ''} 的全部持股紀錄？`;
+    $('#deleteDialog').showModal();
+  }
+
+  $('#cancelDeleteBtn').addEventListener('click', () => {
+    pendingDelete = null;
+    $('#deleteDialog').close();
+  });
+  $('#confirmDeleteBtn').addEventListener('click', () => {
+    if (!pendingDelete) return;
+    RS_STORAGE.removeTradesBySymbol(pendingDelete);
+    pendingDelete = null;
+    $('#deleteDialog').close();
+    renderPortfolio();
+    toast('已刪除持股');
+  });
+
+  $('#positionList').addEventListener('click', (e) => {
+    const sellBtn = e.target.closest('[data-sell]');
+    if (sellBtn) {
+      e.stopPropagation();
+      openSellDialog(sellBtn.dataset.sell);
+      return;
+    }
+    const delBtn = e.target.closest('[data-delete-pos]');
+    if (delBtn) {
+      e.stopPropagation();
+      openDeleteDialog(delBtn.dataset.deletePos, delBtn.dataset.name);
+    }
+  });
+
   $('#metricsBtn').addEventListener('click', () => {
     const trades = RS_STORAGE.loadTrades();
     const positions = RS_PORTFOLIO.buildPositions(trades, state.priceMap);
@@ -447,6 +548,7 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
 
   // chart / settings
   document.body.addEventListener('click', (e) => {
+    if (e.target.closest('button, .item-actions')) return;
     const item = e.target.closest('[data-open-chart]');
     if (!item) return;
     openChart(item.dataset.openChart, item.dataset.name, item.dataset.market, item.dataset.pivot);

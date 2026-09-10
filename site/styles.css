@@ -70,6 +70,16 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 20px; }
 }
 .item-title { font-weight: 700; }
 .item-right { text-align: right; }
+.item-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.item-actions .ghost-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
 .badge {
   display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px;
   font-size: 0.72rem; font-weight: 600; background: var(--accent-soft); color: var(--accent);
