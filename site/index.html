@@ -96,7 +96,10 @@
         <label for="dataBaseUrl">資料來源 URL</label>
         <textarea id="dataBaseUrl" rows="3" spellcheck="false"></textarea>
         <p class="hint">預設 <code>./data</code>（隨網站一起部署的每日 JSON）。若你改成公開 raw 網址也可以。</p>
-        <button id="saveSettingsBtn" class="primary-btn" type="button">儲存並重新載入</button>
+        <div class="row-actions">
+          <button id="saveSettingsBtn" class="primary-btn" type="button">儲存並重新載入</button>
+          <button id="resetSettingsBtn" class="ghost-btn" type="button">恢復預設</button>
+        </div>
       </div>
       <div class="card">
         <h3>iPhone 使用方式</h3>
