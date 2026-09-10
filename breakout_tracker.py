@@ -43,6 +43,24 @@ MARKET_NEUTRAL = "市況中性"
 MARKET_BAD = "市況不佳"
 MARKET_NA = "樣本不足"
 
+PRICE_FIELDS = (
+    "pivot", "breakout_close", "outcome_close", "peak_close",
+    "trough_close", "last_close",
+)
+
+
+def round_price(x: float | None) -> float | None:
+    """Round a stock price for JSON export (TWD tick = 0.01)."""
+    if x is None:
+        return None
+    return round(float(x), 2)
+
+
+def _sanitize_trade_prices(trade: dict) -> None:
+    for k in PRICE_FIELDS:
+        if k in trade and trade[k] is not None:
+            trade[k] = round_price(trade[k])
+
 
 def empty_ledger() -> dict:
     return {"version": LEDGER_VERSION, "trades": [], "history": []}
@@ -64,6 +82,8 @@ def load_ledger(path: str) -> dict:
 
 
 def save_ledger(ledger: dict, path: str) -> None:
+    for t in ledger.get("trades", []):
+        _sanitize_trade_prices(t)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(ledger, f, ensure_ascii=False, indent=1)
@@ -100,8 +120,9 @@ def _evaluate(trade: dict, s: pd.Series, p: PatternParams) -> None:
     for ts, px in _bars_after(s, trade["last_date"]).items():
         px = float(px)
         d = _date_str(ts)
-        trade["peak_close"] = max(trade.get("peak_close") or px, px)
-        trade["trough_close"] = min(trade.get("trough_close") or px, px)
+        px = round_price(px)
+        trade["peak_close"] = round_price(max(trade.get("peak_close") or px, px))
+        trade["trough_close"] = round_price(min(trade.get("trough_close") or px, px))
         trade["last_date"] = d
         trade["last_close"] = px
         if px >= up:
@@ -156,7 +177,7 @@ def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
         if _bars_since(s, t["outcome_date"]) > RECOVER_MAX_BARS:
             continue
         pivot = float(t["pivot"])
-        last = float(s.iloc[-1])
+        last = round_price(float(s.iloc[-1]))
         t["last_date"] = _date_str(s.index[-1])
         t["last_close"] = last
         if last >= pivot:
@@ -242,7 +263,8 @@ def _open_trade(meta: dict, s: pd.Series, pivot: float, breakout_date: str,
         if breakout_date not in dates:
             return None
         breakout_idx = dates.index(breakout_date)
-    px = float(s.iloc[breakout_idx])
+    px = round_price(float(s.iloc[breakout_idx]))
+    pivot = round_price(pivot)
     t = {
         "trade_id": _trade_id(meta["id"], breakout_date, pivot),
         "id": meta["id"],
@@ -252,7 +274,7 @@ def _open_trade(meta: dict, s: pd.Series, pivot: float, breakout_date: str,
         "pattern_label": meta.get("pattern_label"),
         "yf_ticker": meta.get("yf_ticker"),
         "rs": meta.get("rs"),
-        "pivot": round(pivot, 2),
+        "pivot": pivot,
         "breakout_date": breakout_date,
         "breakout_close": px,
         "origin": origin,
@@ -343,4 +365,9 @@ def recent_trades(ledger: dict, close_df: pd.DataFrame | None = None,
     keys = ("trade_id", "id", "name", "market", "pattern", "pattern_label", "rs", "pivot",
             "breakout_date", "breakout_close", "status", "outcome", "outcome_date", "outcome_close",
             "outcome_pct", "peak_close", "trough_close", "last_date", "last_close", "origin")
-    return [{k: t.get(k) for k in keys} for t in trades[:limit]]
+    out = []
+    for t in trades[:limit]:
+        row = {k: t.get(k) for k in keys}
+        _sanitize_trade_prices(row)
+        out.append(row)
+    return out

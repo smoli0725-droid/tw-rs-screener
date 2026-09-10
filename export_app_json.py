@@ -11,20 +11,30 @@ import numpy as np
 import pandas as pd
 
 from pattern_screener import patterns_by_symbol
+from breakout_tracker import round_price
+
+PRICE_JSON_KEYS = frozenset({
+    "breakout_close", "outcome_close", "peak_close", "trough_close", "last_close",
+    "pivot", "close", "open", "high", "low", "price", "ma50", "ma150", "ma200",
+})
 
 
-def _json_safe(obj: Any) -> Any:
+def _json_safe(obj: Any, *, price_key: bool = False) -> Any:
     if isinstance(obj, dict):
-        return {k: _json_safe(v) for k, v in obj.items()}
+        return {k: _json_safe(v, price_key=(k in PRICE_JSON_KEYS)) for k, v in obj.items()}
     if isinstance(obj, list):
-        return [_json_safe(v) for v in obj]
+        return [_json_safe(v, price_key=price_key) for v in obj]
     if isinstance(obj, (np.integer,)):
         return int(obj)
     if isinstance(obj, (np.floating,)):
         v = float(obj)
-        return None if np.isnan(v) else v
-    if isinstance(obj, float) and np.isnan(obj):
-        return None
+        if np.isnan(v):
+            return None
+        return round_price(v) if price_key else v
+    if isinstance(obj, float):
+        if np.isnan(obj):
+            return None
+        return round_price(obj) if price_key else obj
     if isinstance(obj, (pd.Timestamp, dt.datetime, dt.date)):
         return obj.isoformat()
     if isinstance(obj, np.bool_):
@@ -40,7 +50,7 @@ def _row_to_rs85(row: pd.Series, pattern_tags: list[str]) -> dict:
         "market": str(row["市場"]),
         "industry": str(row["產業"]),
         "rs": int(row["RS"]),
-        "close": float(row["收盤價"]),
+        "close": round_price(float(row["收盤價"])),
         "template_pass": row.get("通過樣板", "") == "✔",
         "template_count": int(row["通過項數"]) if pd.notna(row.get("通過項數")) else 0,
         "dist_ma50_pct": float(row["距50MA%"]) if pd.notna(row.get("距50MA%")) else None,
@@ -61,12 +71,12 @@ def _pattern_to_json(p: dict) -> dict:
         "market": p["市場"],
         "industry": p["產業"],
         "rs": int(p["RS"]),
-        "close": float(p["收盤價"]),
+        "close": round_price(float(p["收盤價"])),
         "template_pass": p.get("通過樣板", "") == "✔",
         "dist_ma50_pct": p.get("距50MA%"),
         "pattern": p.get("pattern"),
         "pattern_label": p.get("pattern_label"),
-        "pivot": p.get("pivot"),
+        "pivot": round_price(p.get("pivot")) if p.get("pivot") is not None else None,
         "dist_pivot_pct": p.get("dist_pivot_pct"),
         "status": p.get("status"),
         "score": p.get("score"),
@@ -136,13 +146,13 @@ def _recovered_rows(ledger: dict | None, ranking: pd.DataFrame,
             "市場": t.get("market") or (row["市場"] if row is not None else ""),
             "產業": row["產業"] if row is not None else "",
             "RS": int(row["RS"]) if row is not None else int(t.get("rs") or 0),
-            "收盤價": close,
+            "收盤價": round_price(close),
             "通過樣板": row.get("通過樣板", "") if row is not None else "",
             "距50MA%": float(row["距50MA%"]) if row is not None and pd.notna(row.get("距50MA%")) else None,
             "yf_ticker": yf,
             "pattern": t.get("pattern"),
             "pattern_label": f"{t.get('pattern_label') or t.get('pattern')}（復甦）",
-            "pivot": round(pivot, 2),
+            "pivot": round_price(pivot),
             "dist_pivot_pct": round((close / pivot - 1) * 100, 2),
             "status": STATUS_NEAR,
             "score": _score(STATUS_NEAR, close, pivot, vr, 10),
@@ -156,7 +166,7 @@ def _recovered_rows(ledger: dict | None, ranking: pd.DataFrame,
             "breakout_date": None,
             "days_since_breakout": None,
             "recovered": True,
-            "annotations": [{"type": "failed_breakout", "date": t.get("breakout_date"), "price": pivot}],
+            "annotations": [{"type": "failed_breakout", "date": t.get("breakout_date"), "price": round_price(pivot)}],
             "detail": {"failed_on": t.get("outcome_date"), "failed_pct": t.get("outcome_pct")},
         })
     return rows
