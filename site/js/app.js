@@ -612,15 +612,27 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     $('#tradeDialog').showModal();
   });
 
+  function isValidDataBase(url) {
+    if (!url) return false;
+    if (/^https?:\/\//.test(url)) return true;
+    return url === './data' || url === '/data' || url === 'data';
+  }
+
   $('#dataBaseUrl').value = RS_STORAGE.getDataBaseUrl();
   $('#saveSettingsBtn').addEventListener('click', async () => {
     const url = $('#dataBaseUrl').value.trim().replace(/\/$/, '');
-    if (!/^https?:\/\//.test(url)) {
-      toast('請輸入有效 URL');
+    if (!isValidDataBase(url)) {
+      toast('請輸入有效 URL 或相對路徑（如 ./data）');
       return;
     }
     RS_STORAGE.setDataBaseUrl(url);
     toast('已儲存');
+    await refresh();
+  });
+  $('#resetSettingsBtn').addEventListener('click', async () => {
+    RS_STORAGE.clearDataBaseUrl();
+    $('#dataBaseUrl').value = RS_CONFIG.DEFAULT_DATA_BASE;
+    toast('已恢復預設');
     await refresh();
   });
   $('#refreshBtn').addEventListener('click', () => refresh());

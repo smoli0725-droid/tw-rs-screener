@@ -37,6 +37,8 @@ from breakout_tracker import (
     market_stats,
     recovered_candidates,
     recent_trades,
+    save_ledger,
+    round_price,
     TRADE_ACTIVE,
     TRADE_SUCCESS,
     TRADE_FAILED,
@@ -567,6 +569,79 @@ def test_recent_trades_hides_old_outcomes():
     ids = [r["id"] for r in rows]
     assert "a" in ids and "c" in ids
     assert "b" not in ids
+
+
+def test_round_price_strips_float_noise():
+    assert round_price(26.850000381469727) == 26.85
+    assert round_price(None) is None
+
+
+def test_tracker_prices_rounded_in_json(tmp_path):
+    """breakout_close 等價格欄位寫入 JSON 時不得帶 binary float 尾數。"""
+    noisy = 26.850000381469727
+    ledger = empty_ledger()
+    ledger["trades"] = [{
+        "trade_id": "1409-2026-09-09-25.2",
+        "id": "1409", "pivot": 25.2, "breakout_date": "2026-09-09",
+        "breakout_close": noisy, "peak_close": noisy, "trough_close": 25.149999618530273,
+        "last_close": noisy, "status": TRADE_ACTIVE, "outcome": None,
+        "outcome_date": None, "outcome_close": None, "outcome_pct": None,
+        "last_date": "2026-09-10", "origin": "pattern",
+    }]
+    path = str(tmp_path / "ledger.json")
+    save_ledger(ledger, path)
+    with open(path) as f:
+        raw = f.read()
+    assert "381469727" not in raw
+    assert "618530273" not in raw
+    with open(path) as f:
+        saved = json.load(f)
+    t = saved["trades"][0]
+    assert t["breakout_close"] == 26.85
+    assert t["trough_close"] == 25.15
+    rows = recent_trades(ledger)
+    assert rows[0]["breakout_close"] == 26.85
+
+
+def test_export_breakouts_prices_rounded(tmp_path):
+    """export breakouts.json 時清理既有帳本中的 float 雜訊。"""
+    ohlcv, close, volume, twii, uni = make_synthetic()
+    result = compute_rs(close)
+    template = compute_template(close[result.index.tolist()], volume, twii, result["RS"])
+    ranking = export(result, template, uni, data_date=close.index[-1].date(),
+                     outdir=str(tmp_path / "output"))
+    ledger = empty_ledger()
+    ledger["trades"] = [{
+        "trade_id": "1111-2026-09-09-100",
+        "id": "1111", "name": "測試", "market": "上市", "pattern": "VCP",
+        "pattern_label": "VCP", "rs": 90, "pivot": 100.0,
+        "breakout_date": "2026-09-09",
+        "breakout_close": 101.4000015258789,
+        "status": TRADE_ACTIVE, "outcome": None, "outcome_date": None,
+        "outcome_close": None, "outcome_pct": None,
+        "peak_close": 101.4000015258789, "trough_close": 99.69999694824219,
+        "last_date": close.index[-1].date().isoformat(),
+        "last_close": 101.4000015258789, "origin": "pattern",
+    }]
+    ledger["history"] = []
+    ledger["market"] = {"label": "樣本不足", "wins": 0, "losses": 0, "pending": 1,
+                        "win_rate": None}
+    freshness = {
+        "data_date": close.index[-1].date().isoformat(),
+        "is_fresh": True, "is_trading_day": True,
+        "source_checked_at": "x", "message": "ok", "twse_cross_check": None,
+    }
+    export_app_json(ranking, [], ohlcv, freshness,
+                    outdir=str(tmp_path / "app"), ledger=ledger)
+    with open(tmp_path / "app" / "breakouts.json") as f:
+        raw = f.read()
+    assert "5258789" not in raw
+    assert "94824219" not in raw
+    with open(tmp_path / "app" / "breakouts.json") as f:
+        data = json.load(f)
+    t = data["trades"][0]
+    assert t["breakout_close"] == 101.4
+    assert t["trough_close"] == 99.7
 
 
 def test_is_likely_trading_day():
