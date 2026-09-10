@@ -81,7 +81,7 @@
             <button class="chip active" data-trade="success" type="button">成功</button>
             <button class="chip active" data-trade="failed" type="button">失敗</button>
             <button class="chip active" data-trade="recovered" type="button">復甦</button>
-            <button class="chip" data-trade="reentered" type="button">再突破</button>
+            <button class="chip active" data-trade="reentered" type="button">再突破</button>
           </div>
         </div>
         <div id="tradeCount" class="count-line"></div>
@@ -91,6 +91,10 @@
     </section>
 
     <section id="view-settings" class="view">
+      <div class="card" id="dataStatusCard">
+        <h3>資料狀態</h3>
+        <div id="dataStatusBody" class="hint">載入中…</div>
+      </div>
       <div class="card form-card">
         <label for="dataBaseUrl">資料來源 URL</label>
         <textarea id="dataBaseUrl" rows="3" spellcheck="false"></textarea>

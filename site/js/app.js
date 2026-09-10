@@ -13,7 +13,7 @@
     rsQuery: '',
     statuses: new Set(['即將突破', '已突破']),
     patternTypes: new Set(),
-    tradeStatuses: new Set(['active', 'success', 'failed', 'recovered']),
+    tradeStatuses: new Set(['active', 'success', 'failed', 'recovered', 'reentered']),
     chartContext: null,
   };
 
@@ -26,6 +26,13 @@
     reentered: '再突破',
   };
   const TRADE_CLASS = { active: 'warn', success: 'ok', failed: 'hot', recovered: 'hot', reentered: 'muted' };
+
+  function localDateKey(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
 
   const fmt = {
     money: (n) =>
@@ -66,6 +73,7 @@
       state.priceMap = data.priceMap;
       state.breakouts = data.breakouts;
       renderMeta();
+      renderDataStatus();
       renderMarket();
       renderPortfolio();
       buildPatternChips();
@@ -88,7 +96,22 @@
       `資料 ${m.data_date || '—'} · RS85 ${c.rs85 ?? '—'} · 型態 ${c.pattern_symbols ?? c.patterns ?? '—'} 檔 · 即將突破 ${
         c.near_breakout ?? '—'
       } · 可買 ${c.broke_out ?? '—'}${rate}` +
-      (m.message ? ` · ${m.message}` : m.is_fresh === false ? ' · 資料可能未更新' : '');
+      (m.is_fresh === false ? ' · 資料可能過期' : '');
+  }
+
+  function renderDataStatus() {
+    const el = $('#dataStatusBody');
+    if (!el) return;
+    const m = state.meta || {};
+    if (!m.data_date && m.is_fresh == null && !m.message) {
+      el.textContent = '尚無資料';
+      return;
+    }
+    const fresh =
+      m.is_fresh === false ? '可能過期' : m.is_fresh === true ? '已更新' : '—';
+    el.innerHTML = `<p>資料日期：<strong>${esc(m.data_date || '—')}</strong></p>
+      <p>新鮮度：<strong>${esc(fresh)}</strong></p>
+      ${m.message ? `<p class="item-sub">${esc(m.message)}</p>` : ''}`;
   }
 
   function renderMarket() {
@@ -131,9 +154,11 @@
       .map(
         (p) => `<article class="item" data-open-chart="${p.symbol}" data-name="${esc(p.name)}" data-market="${esc(p.market)}">
         <div>
-          <div class="item-title">${p.symbol} ${esc(p.name)}</div>
+          <div class="item-title">${p.symbol} ${esc(p.name)}${
+            p.lastPrice == null ? '<span class="badge warn">無報價</span>' : ''
+          }</div>
           <div class="item-sub">成本 ${fmt.money(p.cost)} × ${p.shares}<br/>現價 ${
-            p.lastPrice == null ? '（名單無報價，暫用成本）' : fmt.money(p.lastPrice)
+            p.lastPrice == null ? '暫用成本估算' : fmt.money(p.lastPrice)
           }</div>
         </div>
         <div class="item-right">
@@ -207,6 +232,14 @@
     return v == null ? '—' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)}%`;
   }
 
+  function fmtVolDry(ratio) {
+    if (ratio == null) return '';
+    const n = Number(ratio);
+    if (Number.isNaN(n)) return '';
+    if (n < 1) return ' · <span class="vol-tag vol-shrink">量縮</span>';
+    return ` · <span class="vol-tag vol-expand">量比 ${n}</span>`;
+  }
+
   function renderPatterns() {
     // 一檔一型態:資料端已只輸出一筆;這裡再依代號去重以防舊資料
     const seen = new Set();
@@ -243,7 +276,7 @@
 樞紐 ${fmt.money(r.pivot)}（${fmtDist(r.dist_pivot_pct)}）${bo}<br/>
 ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.base_weeks + '週 · ' : ''}${
           r.structure_date ? '結構 ' + String(r.structure_date).slice(5) : ''
-        }${r.vol_dry_ratio != null ? ' · 量縮 ' + r.vol_dry_ratio : ''}</div>
+        }${fmtVolDry(r.vol_dry_ratio)}</div>
           </div>
           <div class="item-right"><div><strong>${
             r.score != null ? Number(r.score).toFixed(0) : ''
@@ -386,7 +419,7 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
   $('#addTradeBtn').addEventListener('click', () => {
     const form = $('#tradeForm');
     form.reset();
-    form.date.value = new Date().toISOString().slice(0, 10);
+    form.date.value = localDateKey();
     $('#tradeDialog').showModal();
   });
   $('#cancelTradeBtn').addEventListener('click', () => {
@@ -415,7 +448,9 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     });
     $('#tradeDialog').close();
     renderPortfolio();
-    toast('已新增持股');
+    toast(
+      !hit ? '已新增持股（此代號不在 RS85／型態名單，無法取得報價）' : '已新增持股'
+    );
   });
 
   let pendingDelete = null;
@@ -441,7 +476,7 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     form.shares.value = pos.shares;
     form.shares.max = pos.shares;
     form.price.value = pos.lastPrice != null ? pos.lastPrice : pos.cost;
-    form.date.value = new Date().toISOString().slice(0, 10);
+    form.date.value = localDateKey();
     $('#sellHint').textContent = `${pos.symbol} ${pos.name} · 目前持股 ${pos.shares} 股`;
     $('#sellDialog').showModal();
   }
@@ -563,7 +598,7 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     form.id.value = ctx.id;
     form.name.value = ctx.name || '';
     form.market.value = ctx.market === '上櫃' ? '上櫃' : '上市';
-    form.date.value = new Date().toISOString().slice(0, 10);
+    form.date.value = localDateKey();
     if (state.priceMap[ctx.id] != null) form.price.value = state.priceMap[ctx.id];
     $('#tradeDialog').showModal();
   });

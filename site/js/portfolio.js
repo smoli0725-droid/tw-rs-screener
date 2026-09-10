@@ -1,4 +1,10 @@
 window.RS_PORTFOLIO = (() => {
+  function localMonthKey(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }
+
   function buildPositions(trades, priceMap = {}) {
     const lots = {};
     const sorted = [...trades].sort((a, b) => String(a.date).localeCompare(String(b.date)));
@@ -87,7 +93,7 @@ window.RS_PORTFOLIO = (() => {
       const key = String(c.sellDate).slice(0, 7);
       monthlyMap[key] = (monthlyMap[key] || 0) + c.pnl;
     }
-    const nowKey = new Date().toISOString().slice(0, 7);
+    const nowKey = localMonthKey();
     for (const p of positions) monthlyMap[nowKey] = (monthlyMap[nowKey] || 0) + p.pnl;
     const costBase = positions.reduce((s, p) => s + p.costValue, 0) || 1;
     const monthly = Object.keys(monthlyMap)

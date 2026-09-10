@@ -89,6 +89,11 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 20px; }
 .badge.warn { background: #fff1d6; color: var(--warn); }
 .badge.ext { background: #e6e9ef; color: #556070; }
 .badge.muted { background: #eef1f0; color: var(--muted); font-weight: 500; }
+.vol-tag { font-weight: 600; }
+.vol-shrink { color: var(--down); }
+.vol-expand { color: var(--warn); }
+#dataStatusCard h3 { margin: 0 0 8px; font-size: 1rem; }
+#dataStatusCard p { margin: 4px 0; }
 .market-card { margin-bottom: 12px; display: flex; align-items: center; gap: 14px; }
 .market-rate { font-size: 1.9rem; font-weight: 700; line-height: 1; min-width: 92px; }
 .market-rate.good { color: var(--down); }
