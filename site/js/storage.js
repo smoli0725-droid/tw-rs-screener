@@ -6,6 +6,9 @@ window.RS_STORAGE = (() => {
   function setDataBaseUrl(url) {
     localStorage.setItem(K.dataBaseUrl, String(url).replace(/\/$/, ''));
   }
+  function clearDataBaseUrl() {
+    localStorage.removeItem(K.dataBaseUrl);
+  }
   function loadTrades() {
     try {
       return JSON.parse(localStorage.getItem(K.trades) || '[]');
@@ -22,5 +25,5 @@ window.RS_STORAGE = (() => {
     saveTrades(trades);
     return trades;
   }
-  return { getDataBaseUrl, setDataBaseUrl, loadTrades, saveTrades, addTrade };
+  return { getDataBaseUrl, setDataBaseUrl, clearDataBaseUrl, loadTrades, saveTrades, addTrade };
 })();
