@@ -13,7 +13,7 @@
     rsQuery: '',
     statuses: new Set(['即將突破', '已突破']),
     patternTypes: new Set(),
-    tradeStatuses: new Set(['active', 'success', 'failed', 'recovered']),
+    tradeStatuses: new Set(['active', 'success', 'failed', 'recovered', 'reentered']),
     chartContext: null,
   };
 
@@ -26,6 +26,13 @@
     reentered: '再突破',
   };
   const TRADE_CLASS = { active: 'warn', success: 'ok', failed: 'hot', recovered: 'hot', reentered: 'muted' };
+
+  function localDateKey(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
 
   const fmt = {
     money: (n) =>
@@ -66,6 +73,7 @@
       state.priceMap = data.priceMap;
       state.breakouts = data.breakouts;
       renderMeta();
+      renderDataStatus();
       renderMarket();
       renderPortfolio();
       buildPatternChips();
@@ -88,7 +96,22 @@
       `資料 ${m.data_date || '—'} · RS85 ${c.rs85 ?? '—'} · 型態 ${c.pattern_symbols ?? c.patterns ?? '—'} 檔 · 即將突破 ${
         c.near_breakout ?? '—'
       } · 可買 ${c.broke_out ?? '—'}${rate}` +
-      (m.message ? ` · ${m.message}` : m.is_fresh === false ? ' · 資料可能未更新' : '');
+      (m.is_fresh === false ? ' · 資料可能過期' : '');
+  }
+
+  function renderDataStatus() {
+    const el = $('#dataStatusBody');
+    if (!el) return;
+    const m = state.meta || {};
+    if (!m.data_date && m.is_fresh == null && !m.message) {
+      el.textContent = '尚無資料';
+      return;
+    }
+    const fresh =
+      m.is_fresh === false ? '可能過期' : m.is_fresh === true ? '已更新' : '—';
+    el.innerHTML = `<p>資料日期：<strong>${esc(m.data_date || '—')}</strong></p>
+      <p>新鮮度：<strong>${esc(fresh)}</strong></p>
+      ${m.message ? `<p class="item-sub">${esc(m.message)}</p>` : ''}`;
   }
 
   function renderMarket() {
@@ -131,14 +154,20 @@
       .map(
         (p) => `<article class="item" data-open-chart="${p.symbol}" data-name="${esc(p.name)}" data-market="${esc(p.market)}">
         <div>
-          <div class="item-title">${p.symbol} ${esc(p.name)}</div>
+          <div class="item-title">${p.symbol} ${esc(p.name)}${
+            p.lastPrice == null ? '<span class="badge warn">無報價</span>' : ''
+          }</div>
           <div class="item-sub">成本 ${fmt.money(p.cost)} × ${p.shares}<br/>現價 ${
-            p.lastPrice == null ? '（名單無報價，暫用成本）' : fmt.money(p.lastPrice)
+            p.lastPrice == null ? '暫用成本估算' : fmt.money(p.lastPrice)
           }</div>
         </div>
         <div class="item-right">
           <div class="${fmt.pnlClass(p.returnPct)}">${fmt.pct(p.returnPct)}</div>
           <div class="item-sub ${fmt.pnlClass(p.pnl)}">${fmt.money(p.pnl)}</div>
+        </div>
+        <div class="item-actions">
+          <button type="button" class="ghost-btn" data-sell="${p.symbol}">賣出</button>
+          <button type="button" class="ghost-btn" data-delete-pos="${p.symbol}" data-name="${esc(p.name)}">刪除</button>
         </div>
       </article>`
       )
@@ -203,6 +232,14 @@
     return v == null ? '—' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)}%`;
   }
 
+  function fmtVolDry(ratio) {
+    if (ratio == null) return '';
+    const n = Number(ratio);
+    if (Number.isNaN(n)) return '';
+    if (n < 1) return ' · <span class="vol-tag vol-shrink">量縮</span>';
+    return ` · <span class="vol-tag vol-expand">量比 ${n}</span>`;
+  }
+
   function renderPatterns() {
     // 一檔一型態:資料端已只輸出一筆;這裡再依代號去重以防舊資料
     const seen = new Set();
@@ -239,7 +276,7 @@
 樞紐 ${fmt.money(r.pivot)}（${fmtDist(r.dist_pivot_pct)}）${bo}<br/>
 ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.base_weeks + '週 · ' : ''}${
           r.structure_date ? '結構 ' + String(r.structure_date).slice(5) : ''
-        }${r.vol_dry_ratio != null ? ' · 量縮 ' + r.vol_dry_ratio : ''}</div>
+        }${fmtVolDry(r.vol_dry_ratio)}</div>
           </div>
           <div class="item-right"><div><strong>${
             r.score != null ? Number(r.score).toFixed(0) : ''
@@ -297,14 +334,17 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     $('#chartDialog').showModal();
     try {
       const raw = await RS_DATA.loadOhlcv(RS_STORAGE.getDataBaseUrl(), id);
-      const candles = (raw.candles || []).map((c) => ({
-        ...c,
-        ma50: c.ma50 ?? c.ma_50,
-        ma150: c.ma150 ?? c.ma_150,
-        ma200: c.ma200 ?? c.ma_200,
-      }));
-      RS_CHART.draw($('#chartCanvas'), { candles }, pivot !== '' && pivot != null ? Number(pivot) : null);
-      $('#chartLegend').textContent = '橘 MA50 · 紫 MA150 · 青 MA200 · 紅虛線樞紐';
+      const ohlcv = {
+        candles: (raw.candles || []).map((c) => ({
+          ...c,
+          ma50: c.ma50 ?? c.ma_50,
+          ma150: c.ma150 ?? c.ma_150,
+          ma200: c.ma200 ?? c.ma_200,
+        })),
+        annotations: raw.annotations || [],
+      };
+      RS_CHART.draw($('#chartCanvas'), ohlcv, pivot !== '' && pivot != null ? Number(pivot) : null);
+      $('#chartLegend').textContent = RS_CHART.legendText(ohlcv);
     } catch (e) {
       RS_CHART.draw($('#chartCanvas'), { candles: [] }, null);
       $('#chartLegend').textContent = `K 線載入失敗：${e.message}`;
@@ -379,7 +419,7 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
   $('#addTradeBtn').addEventListener('click', () => {
     const form = $('#tradeForm');
     form.reset();
-    form.date.value = new Date().toISOString().slice(0, 10);
+    form.date.value = localDateKey();
     $('#tradeDialog').showModal();
   });
   $('#cancelTradeBtn').addEventListener('click', () => {
@@ -408,7 +448,103 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     });
     $('#tradeDialog').close();
     renderPortfolio();
-    toast('已新增持股');
+    toast(
+      !hit ? '已新增持股（此代號不在 RS85／型態名單，無法取得報價）' : '已新增持股'
+    );
+  });
+
+  let pendingDelete = null;
+
+  function openShares(symbol) {
+    const pos = RS_PORTFOLIO.buildPositions(RS_STORAGE.loadTrades(), state.priceMap).find(
+      (p) => String(p.symbol) === String(symbol)
+    );
+    return pos || null;
+  }
+
+  function openSellDialog(symbol) {
+    const pos = openShares(symbol);
+    if (!pos) {
+      toast('找不到持股');
+      return;
+    }
+    const form = $('#sellForm');
+    form.reset();
+    form.symbol.value = pos.symbol;
+    form.name.value = pos.name || pos.symbol;
+    form.market.value = pos.market || '上市';
+    form.shares.value = pos.shares;
+    form.shares.max = pos.shares;
+    form.price.value = pos.lastPrice != null ? pos.lastPrice : pos.cost;
+    form.date.value = localDateKey();
+    $('#sellHint').textContent = `${pos.symbol} ${pos.name} · 目前持股 ${pos.shares} 股`;
+    $('#sellDialog').showModal();
+  }
+
+  $('#cancelSellBtn').addEventListener('click', () => $('#sellDialog').close());
+  $('#sellForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData($('#sellForm'));
+    const symbol = String(fd.get('symbol') || '').trim();
+    const price = Number(fd.get('price'));
+    const shares = Number(fd.get('shares'));
+    const pos = openShares(symbol);
+    if (!pos) {
+      toast('找不到持股');
+      return;
+    }
+    if (!(price > 0) || !(shares > 0)) {
+      toast('請確認賣出價／股數');
+      return;
+    }
+    if (shares > pos.shares) {
+      toast(`賣出股數不可超過目前持股 ${pos.shares}`);
+      return;
+    }
+    RS_STORAGE.addSell({
+      symbol,
+      name: String(fd.get('name') || pos.name || symbol).trim(),
+      market: String(fd.get('market') || pos.market || '上市'),
+      price,
+      shares,
+      date: String(fd.get('date')),
+    });
+    $('#sellDialog').close();
+    renderPortfolio();
+    toast(shares >= pos.shares ? '已全部賣出' : '已賣出');
+  });
+
+  function openDeleteDialog(symbol, name) {
+    pendingDelete = symbol;
+    $('#deleteHint').textContent = `確定刪除 ${symbol} ${name || ''} 的全部持股紀錄？`;
+    $('#deleteDialog').showModal();
+  }
+
+  $('#cancelDeleteBtn').addEventListener('click', () => {
+    pendingDelete = null;
+    $('#deleteDialog').close();
+  });
+  $('#confirmDeleteBtn').addEventListener('click', () => {
+    if (!pendingDelete) return;
+    RS_STORAGE.removeTradesBySymbol(pendingDelete);
+    pendingDelete = null;
+    $('#deleteDialog').close();
+    renderPortfolio();
+    toast('已刪除持股');
+  });
+
+  $('#positionList').addEventListener('click', (e) => {
+    const sellBtn = e.target.closest('[data-sell]');
+    if (sellBtn) {
+      e.stopPropagation();
+      openSellDialog(sellBtn.dataset.sell);
+      return;
+    }
+    const delBtn = e.target.closest('[data-delete-pos]');
+    if (delBtn) {
+      e.stopPropagation();
+      openDeleteDialog(delBtn.dataset.deletePos, delBtn.dataset.name);
+    }
   });
 
   $('#metricsBtn').addEventListener('click', () => {
@@ -426,20 +562,29 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
       <p>平均報酬（持股）：<strong class="${fmt.pnlClass(m.avgOpenReturnPct || 0)}">${
         m.avgOpenReturnPct == null ? '—' : fmt.pct(m.avgOpenReturnPct)
       }</strong></p>
-      <h3>月績效</h3>
+      <h3>持倉浮動</h3>
+      <p>未實現損益：<strong class="${fmt.pnlClass(m.unrealizedPnl || 0)}">${
+        m.openCount ? fmt.money(m.unrealizedPnl) : '—'
+      }</strong></p>
+      <p>持倉成本：<strong>${m.openCount ? fmt.money(m.openCost) : '—'}</strong></p>
+      <p>浮動報酬：<strong class="${fmt.pnlClass(m.unrealizedReturnPct || 0)}">${
+        fmt.pct(m.unrealizedReturnPct)
+      }</strong></p>
+      <h3>月績效（已實現）</h3>
+      <p class="hint">每月報酬％＝該月已平倉損益 ÷ 該月賣出部位的買進成本，不含持倉浮動。</p>
       ${
         m.monthly.length
           ? `<div class="list">${m.monthly
               .slice()
               .reverse()
               .map(
-                (row) => `<div class="item"><div>${row.yearMonth}<div class="item-sub">報酬 ${fmt.pct(
-                  row.returnPct
-                )}</div></div>
+                (row) => `<div class="item"><div>${row.yearMonth}<div class="item-sub">已實現報酬 ${
+                  row.returnPct == null ? '—' : fmt.pct(row.returnPct)
+                }</div></div>
                 <div class="item-right ${fmt.pnlClass(row.pnl)}">${fmt.money(row.pnl)}</div></div>`
               )
               .join('')}</div>`
-          : '<p class="hint">尚無資料</p>'
+          : '<p class="hint">尚無已平倉資料</p>'
       }`;
     $('#metricsDialog').showModal();
   });
@@ -447,6 +592,7 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
 
   // chart / settings
   document.body.addEventListener('click', (e) => {
+    if (e.target.closest('button, .item-actions')) return;
     const item = e.target.closest('[data-open-chart]');
     if (!item) return;
     openChart(item.dataset.openChart, item.dataset.name, item.dataset.market, item.dataset.pivot);
@@ -461,7 +607,7 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     form.id.value = ctx.id;
     form.name.value = ctx.name || '';
     form.market.value = ctx.market === '上櫃' ? '上櫃' : '上市';
-    form.date.value = new Date().toISOString().slice(0, 10);
+    form.date.value = localDateKey();
     if (state.priceMap[ctx.id] != null) form.price.value = state.priceMap[ctx.id];
     $('#tradeDialog').showModal();
   });

@@ -82,7 +82,7 @@
             <button class="chip active" data-trade="success" type="button">成功</button>
             <button class="chip active" data-trade="failed" type="button">失敗</button>
             <button class="chip active" data-trade="recovered" type="button">復甦</button>
-            <button class="chip" data-trade="reentered" type="button">再突破</button>
+            <button class="chip active" data-trade="reentered" type="button">再突破</button>
           </div>
         </div>
         <div id="tradeCount" class="count-line"></div>
@@ -92,6 +92,10 @@
     </section>
 
     <section id="view-settings" class="view">
+      <div class="card" id="dataStatusCard">
+        <h3>資料狀態</h3>
+        <div id="dataStatusBody" class="hint">載入中…</div>
+      </div>
       <div class="card form-card">
         <label for="dataBaseUrl">資料來源 URL</label>
         <textarea id="dataBaseUrl" rows="3" spellcheck="false"></textarea>
@@ -137,6 +141,35 @@
         <button value="save" class="primary-btn" type="submit">儲存</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="sellDialog">
+    <form method="dialog" id="sellForm" class="dialog-body">
+      <h2>賣出持股</h2>
+      <p id="sellHint" class="hint"></p>
+      <input type="hidden" name="symbol" />
+      <input type="hidden" name="name" />
+      <input type="hidden" name="market" />
+      <label>股數<input name="shares" type="number" min="1" required /></label>
+      <label>賣出價<input name="price" type="number" step="any" required /></label>
+      <label>日期<input name="date" type="date" required /></label>
+      <div class="dialog-actions">
+        <button value="cancel" class="ghost-btn" type="button" id="cancelSellBtn">取消</button>
+        <button value="save" class="primary-btn" type="submit">確認賣出</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="deleteDialog">
+    <div class="dialog-body">
+      <h2>刪除持股</h2>
+      <p id="deleteHint"></p>
+      <p class="hint">會移除該代號的全部買進／賣出紀錄。輸錯請刪除後再新增，無需編輯表單。</p>
+      <div class="dialog-actions">
+        <button id="cancelDeleteBtn" class="ghost-btn" type="button">取消</button>
+        <button id="confirmDeleteBtn" class="primary-btn" type="button">確認刪除</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="metricsDialog">

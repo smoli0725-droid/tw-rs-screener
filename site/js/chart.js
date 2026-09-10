@@ -1,4 +1,57 @@
 window.RS_CHART = (() => {
+  const ANN_LABEL = {
+    cup_left: '杯左高',
+    cup_bottom: '杯底',
+    pause_high: '停頓高',
+    pullback_high: '回檔高',
+    pullback_low: '回檔低',
+    db_low1: '雙底①',
+    db_mid: '雙底中',
+    db_low2: '雙底②',
+    thrust_high: '推力高',
+    flag_high: '旗形高',
+    flag_low: '旗形低',
+    handle_high: '柄高',
+    handle_low: '柄低',
+    failed_breakout: '失敗突破',
+  };
+  const ANN_HIGH = new Set([
+    'cup_left',
+    'pause_high',
+    'pullback_high',
+    'db_mid',
+    'thrust_high',
+    'flag_high',
+    'handle_high',
+    'failed_breakout',
+  ]);
+  const ANN_COLOR = {
+    cup_left: '#fbbf24',
+    cup_bottom: '#38bdf8',
+    pause_high: '#fb7185',
+    pullback_high: '#f59e0b',
+    pullback_low: '#34d399',
+    db_low1: '#818cf8',
+    db_mid: '#c084fc',
+    db_low2: '#818cf8',
+    thrust_high: '#f472b6',
+    flag_high: '#fb923c',
+    flag_low: '#4ade80',
+    handle_high: '#facc15',
+    handle_low: '#67e8f9',
+    failed_breakout: '#f87171',
+  };
+
+  function labelFor(type) {
+    return ANN_LABEL[type] || type;
+  }
+
+  function legendText(ohlcv) {
+    const base = '橘 MA50 · 紫 MA150 · 青 MA200 · 紅虛線樞紐';
+    const types = [...new Set((ohlcv.annotations || []).map((a) => labelFor(a.type)))].filter(Boolean);
+    return types.length ? `${base} · 標註 ${types.join('／')}` : base;
+  }
+
   function draw(canvas, ohlcv, pivot) {
     const parentW = canvas.parentElement?.clientWidth || 800;
     const cssW = Math.max(300, parentW);
@@ -12,6 +65,7 @@ window.RS_CHART = (() => {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const candles = (ohlcv.candles || []).slice(-120);
+    const annotations = ohlcv.annotations || [];
     ctx.fillStyle = '#0e2a32';
     ctx.fillRect(0, 0, cssW, cssH);
     if (!candles.length) {
@@ -23,8 +77,8 @@ window.RS_CHART = (() => {
 
     const padL = 10;
     const padR = 54;
-    const padT = 18;
-    const padB = 28;
+    const padT = 32;
+    const padB = 36;
     const plotW = cssW - padL - padR;
     const plotH = cssH - padT - padB;
     let minY = Math.min(...candles.map((c) => Number(c.low)));
@@ -35,6 +89,16 @@ window.RS_CHART = (() => {
     if (pivotInRange) {
       minY = Math.min(minY, pv);
       maxY = Math.max(maxY, pv);
+    }
+    const visibleDates = new Set(candles.map((c) => String(c.date).slice(0, 10)));
+    for (const a of annotations) {
+      if (!a.date || !visibleDates.has(String(a.date).slice(0, 10))) continue;
+      const pr = Number(a.price);
+      if (Number.isNaN(pr)) continue;
+      if (pr >= minY * 0.85 && pr <= maxY * 1.15) {
+        minY = Math.min(minY, pr);
+        maxY = Math.max(maxY, pr);
+      }
     }
     const span = maxY - minY || 1;
     minY -= span * 0.05;
@@ -120,7 +184,51 @@ window.RS_CHART = (() => {
     [0, Math.floor(candles.length / 2), candles.length - 1].forEach((i) => {
       ctx.fillText(String(candles[i].date).slice(5), xAt(i) - 14, cssH - 8);
     });
+
+    const dateIndex = new Map();
+    candles.forEach((c, i) => dateIndex.set(String(c.date).slice(0, 10), i));
+    const visibleAnns = annotations.filter((a) => a.date && dateIndex.has(String(a.date).slice(0, 10)));
+    const stackAt = {};
+    visibleAnns.forEach((a) => {
+      const i = dateIndex.get(String(a.date).slice(0, 10));
+      const c = candles[i];
+      const isHigh = ANN_HIGH.has(a.type);
+      const price =
+        a.price != null && !Number.isNaN(Number(a.price))
+          ? Number(a.price)
+          : isHigh
+            ? Number(c.high)
+            : Number(c.low);
+      const x = xAt(i);
+      let y = yAt(price);
+      y = Math.min(padT + plotH - 4, Math.max(padT + 4, y));
+      const stack = (stackAt[`${i}:${isHigh ? 'h' : 'l'}`] ??= { n: 0 });
+      const lift = stack.n * 14;
+      stack.n += 1;
+      const color = ANN_COLOR[a.type] || '#e8f4f1';
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      if (isHigh) {
+        ctx.moveTo(x, y - 2 - lift);
+        ctx.lineTo(x - 5, y - 12 - lift);
+        ctx.lineTo(x + 5, y - 12 - lift);
+      } else {
+        ctx.moveTo(x, y + 2 + lift);
+        ctx.lineTo(x - 5, y + 12 + lift);
+        ctx.lineTo(x + 5, y + 12 + lift);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = '10px sans-serif';
+      ctx.fillStyle = color;
+      const label = labelFor(a.type);
+      const tw = ctx.measureText(label).width;
+      const lx = Math.min(cssW - padR - tw, Math.max(padL, x - tw / 2));
+      ctx.fillText(label, lx, isHigh ? y - 15 - lift : y + 24 + lift);
+      ctx.restore();
+    });
   }
 
-  return { draw };
+  return { draw, legendText, labelFor };
 })();
