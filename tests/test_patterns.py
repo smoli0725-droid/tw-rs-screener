@@ -199,6 +199,77 @@ def make_blowoff_series(n: int = 250):
     return _ohlc_from_close(close, vol_base=120_000)
 
 
+def make_vcp_false_rally_series(n: int = 200):
+    """深度看似收縮,但後段回檔高點大幅抬升(急漲而非 VCP)。
+
+    高點 100 → 147(~+47%),回檔深度 24%→9%。
+    """
+    dates = _dates(n)
+    px = np.full(n, 100.0)
+    for i in range(40):
+        px[i] = 60 + i
+    base = max(40, n - 80)
+    px[base] = 100
+    for i, p in enumerate(np.linspace(100, 76, 10)):
+        px[base + 1 + i] = p
+    for i, p in enumerate(np.linspace(76, 147, 12)):
+        px[base + 11 + i] = p
+    for i, p in enumerate(np.linspace(147, 133.77, 6)):
+        px[base + 23 + i] = p
+    for i, p in enumerate(np.linspace(133.77, 142.0, 8)):
+        px[base + 29 + i] = p
+    last = base + 37
+    px[last:] = 142.0
+    close = pd.Series(px, index=dates)
+    o, h, l, c, v = _ohlc_from_close(close)
+    v.iloc[:] = 200_000
+    v.iloc[-30:] = 80_000
+    for i in range(n):
+        h.iloc[i] = max(h.iloc[i], c.iloc[i])
+        l.iloc[i] = min(l.iloc[i], c.iloc[i])
+    return o, h, l, c, v
+
+
+def make_cheat_mid_then_rim_series(n: int = 280):
+    """底部之後先中段停頓,再抬到上緣再停一次(兩個都合法時應選中段)。"""
+    dates = _dates(n)
+    px = np.full(n, 60.0)
+    segs = [
+        np.linspace(60, 100, 40),
+        np.linspace(100, 70, 10),
+        np.linspace(70, 85, 12),
+        np.array([85 * (1.02 if i % 2 == 0 else 0.98) for i in range(12)]),
+        np.linspace(85, 96, 10),
+        np.array([96 * (1.02 if i % 2 == 0 else 0.98) for i in range(12)]),
+    ]
+    seq = np.concatenate(segs)
+    start = n - len(seq) - 1
+    px[start:start + len(seq)] = seq
+    px[start + len(seq):] = 96.0
+    close = pd.Series(px, index=dates)
+    return _ohlc_from_close(close, vol_base=120_000)
+
+
+def make_cheat_low_then_mid_series(n: int = 280):
+    """底部之後先低位停頓,再抬到中段再停(預設應選中段)。"""
+    dates = _dates(n)
+    px = np.full(n, 60.0)
+    segs = [
+        np.linspace(60, 100, 40),
+        np.linspace(100, 70, 10),
+        np.linspace(70, 75, 8),
+        np.array([75 * (1.02 if i % 2 == 0 else 0.98) for i in range(12)]),
+        np.linspace(75, 85, 10),
+        np.array([85 * (1.02 if i % 2 == 0 else 0.98) for i in range(12)]),
+    ]
+    seq = np.concatenate(segs)
+    start = n - len(seq) - 1
+    px[start:start + len(seq)] = seq
+    px[start + len(seq):] = 85.0
+    close = pd.Series(px, index=dates)
+    return _ohlc_from_close(close, vol_base=120_000)
+
+
 def make_double_bottom_series(n: int = 200):
     """W 底:兩個相近低點,中間反彈,右側緊縮。"""
     dates = _dates(n)
@@ -320,6 +391,24 @@ def test_detect_vcp():
     assert "contraction" in hit
 
 
+def test_vcp_rejects_sharp_rally_as_contraction():
+    """回檔深度仍「收縮」,但後段高點急漲(~+47%)時不得當成 VCP。"""
+    o, h, l, c, v = make_vcp_false_rally_series()
+    p = PatternParams(
+        zigzag_pct=0.04,
+        vcp_shrink_lo=0.30,
+        vcp_shrink_hi=0.85,
+        vcp_last_max_pct=12.0,
+        vcp_max_high_rise=0.15,
+    )
+    assert detect_vcp(o, h, l, c, v, p) is None
+    # 關掉高點抬升守衛後,同一段深度收縮會被當成 VCP(證明不是深度規則殺掉)
+    assert detect_vcp(o, h, l, c, v, PatternParams(
+        zigzag_pct=0.04, vcp_shrink_lo=0.30, vcp_shrink_hi=0.85,
+        vcp_last_max_pct=12.0, vcp_max_high_rise=1.0,
+    )) is not None
+
+
 def test_detect_high_tight_flag():
     o, h, l, c, v = make_flag_series()
     p = PatternParams(flag_prior_gain=0.9, flag_range_pct=0.12, flag_max_retrace=0.30)
@@ -348,8 +437,8 @@ def test_cheat_position_labels():
         assert hit is not None, f"pause@{level} 應偵測到作弊型態"
         assert hit["pattern"] == "作弊型態"
         assert hit["detail"]["position"] == expect, (level, hit["detail"])
-        assert abs(hit["pivot"] - float(h.iloc[-13:-1].max())) < 0.01
         assert hit["pivot"] <= 105  # 不得超過左高 5%
+        assert abs(hit["pivot"] - level) / level < 0.08
 
 
 def test_cheat_base_left_high_is_start_of_decline():
@@ -371,6 +460,70 @@ def test_cheat_rejects_right_side_blowoff():
     # 上緣杯柄基底太短(< 6 週)也不命中
     o, h, l, c, v = make_cheat_series(96.0)
     assert detect_cheat_pattern(o, h, l, c, v, PatternParams(cheat_upper_min_weeks=20)) is None
+
+
+def test_cheat_prefers_mid_pause_over_rim():
+    """中段與上緣都是合法停頓區時,必須選中段,不得改抓較新的上緣休息。"""
+    o, h, l, c, v = make_cheat_mid_then_rim_series()
+    hit = detect_cheat_pattern(o, h, l, c, v)
+    assert hit is not None
+    assert hit["detail"]["position"] == CHEAT_POS_MID
+    assert hit["pivot"] < 92
+    assert hit["pivot"] > 80
+
+
+def test_cheat_low_only_still_emits():
+    """只有低位停頓時仍可輸出低位作弊。"""
+    o, h, l, c, v = make_cheat_series(75.0)
+    hit = detect_cheat_pattern(o, h, l, c, v)
+    assert hit is not None
+    assert hit["detail"]["position"] == CHEAT_POS_LOW
+
+
+def test_cheat_default_prefers_mid_over_low():
+    """低位與中段都在時,預設選中段;prefer_low_over_mid 才改選低位。"""
+    o, h, l, c, v = make_cheat_low_then_mid_series()
+    hit = detect_cheat_pattern(o, h, l, c, v)
+    assert hit is not None
+    assert hit["detail"]["position"] == CHEAT_POS_MID
+    low_hit = detect_cheat_pattern(o, h, l, c, v, PatternParams(prefer_low_over_mid=True))
+    assert low_hit is not None
+    assert low_hit["detail"]["position"] == CHEAT_POS_LOW
+    assert low_hit["pivot"] < hit["pivot"]
+
+
+def _load_app_ohlcv(sid: str):
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "output", "app", "ohlcv", f"{sid}.json")
+    if not os.path.exists(path):
+        pytest.skip(f"missing committed OHLCV {sid}")
+    with open(path) as f:
+        d = json.load(f)
+    candles = d["candles"]
+    idx = pd.DatetimeIndex([c["date"] for c in candles])
+    o = pd.Series([c["open"] for c in candles], index=idx)
+    h = pd.Series([c["high"] for c in candles], index=idx)
+    l = pd.Series([c["low"] for c in candles], index=idx)
+    c = pd.Series([c["close"] for c in candles], index=idx)
+    v = pd.Series([c["volume"] for c in candles], index=idx)
+    return o, h, l, c, v
+
+
+def test_vcp_4908_false_structure_rejected():
+    """4908:深跌後 V 型急漲,兩段回檔高點 163.9→241.5,不得列 VCP。"""
+    o, h, l, c, v = _load_app_ohlcv("4908")
+    hit = detect_vcp(o, h, l, c, v)
+    assert hit is None
+
+
+def test_cheat_6021_prefers_mid_pause():
+    """6021:中段停頓(pivot ~39.95–41)優於較新的上緣 42.65。"""
+    o, h, l, c, v = _load_app_ohlcv("6021")
+    hit = detect_cheat_pattern(o, h, l, c, v)
+    assert hit is not None
+    assert hit["detail"]["position"] == CHEAT_POS_MID
+    assert 39.5 <= hit["pivot"] <= 41.0
+    assert hit["pivot"] != pytest.approx(42.65, abs=0.05)
 
 
 def test_screen_one_returns_single_hit(monkeypatch):

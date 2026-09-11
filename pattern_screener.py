@@ -54,6 +54,8 @@ class PatternParams:
     vcp_shrink_lo: float = 0.35          # 每段深度 ≈ 前段 × (0.35~0.80)
     vcp_shrink_hi: float = 0.80
     vcp_last_max_pct: float = 10.0       # 最後一段 ≤ 10%
+    vcp_max_high_rise: float = 0.15      # 後段回檔高點 ≤ 前段高點 × (1+this);超過視為急漲非收縮
+    vcp_max_vol_dry_ratio: float | None = None  # 若設定,量比 ≥ 此值則不列 VCP(預設不啟用)
 
     # 作弊型態(基底 + 基底內停頓區;停頓區位置決定 低位 / 中段 3-C / 上緣杯柄)
     cheat_prior_min_months: int = 3
@@ -69,6 +71,7 @@ class PatternParams:
     cheat_low_hi: float = 1.0 / 3.0      # 停頓區中點 < 下 1/3 → 低位
     cheat_mid_hi: float = 2.0 / 3.0      # 1/3~2/3 → 中段 3-C;> 2/3 → 上緣(杯柄)
     cheat_upper_min_weeks: int = 6       # 上緣杯柄的基底至少 6 週
+    prefer_low_over_mid: bool = False    # True 時低位優於中段;預設中段 ≥ 低位 ≫ 上緣
 
     # 雙重底
     db_min_weeks: int = 3
@@ -283,6 +286,11 @@ def detect_vcp(o: pd.Series, h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Ser
             prev, cur = seq[-1]["depth_pct"], legs[j]["depth_pct"]
             if prev <= 0:
                 break
+            prev_high = seq[-1]["high"]["price"]
+            cur_high = legs[j]["high"]["price"]
+            # 後段回檔高點大幅抬升 = 急漲,不是收縮(即使深度看起來變淺)
+            if prev_high > 0 and cur_high > prev_high * (1 + p.vcp_max_high_rise):
+                break
             ratio = cur / prev
             if not (p.vcp_shrink_lo <= ratio <= p.vcp_shrink_hi) and cur >= prev:
                 if cur > prev * 1.05:
@@ -313,7 +321,7 @@ def detect_vcp(o: pd.Series, h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Ser
         annotations.append({"type": "pullback_low", "date": leg["low"]["date"],
                             "price": leg["low"]["price"]})
 
-    return {
+    hit = {
         "pattern": "VCP",
         "pattern_label": "VCP 波動收縮",
         **_finish(c, v, pivot, p, depths[-1]),
@@ -325,6 +333,12 @@ def detect_vcp(o: pd.Series, h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Ser
         "annotations": annotations,
         "detail": {"depths": depths},
     }
+    # 可選:量能明顯放大時不列 VCP(量縮是 VCP footprint;預設關閉以免突破放量被誤殺)
+    if p.vcp_max_vol_dry_ratio is not None:
+        vr = hit.get("vol_dry_ratio")
+        if vr is not None and vr >= p.vcp_max_vol_dry_ratio:
+            return None
+    return hit
 
 
 def _find_base_structure(h: pd.Series, l: pd.Series, c: pd.Series,
@@ -358,17 +372,17 @@ def _find_base_structure(h: pd.Series, l: pd.Series, c: pd.Series,
     return best
 
 
-def _pause_zone(h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Series,
-                start_idx: int, p: PatternParams) -> dict | None:
-    """在 start_idx 之後、且 pause_max_span_bars 內,找高低差 ≤ pause_range 的盤整區。
+def _collect_pause_zones(h: pd.Series, l: pd.Series, c: pd.Series,
+                         start_idx: int, p: PatternParams) -> list[dict]:
+    """收集 start_idx 之後、pause_max_span_bars 內所有高低差 ≤ pause_range 的盤整區。
 
     不含最後一根 K:若今天是突破日,其高點不應成為自己的 pivot。
     """
     n = len(c) - 1  # 排除今天
     if start_idx >= n - p.cheat_pause_min_bars:
-        return None
+        return []
     max_end = min(n, start_idx + p.pause_max_span_bars + 1)
-    best = None
+    zones: list[dict] = []
     for end in range(start_idx + p.cheat_pause_min_bars, max_end):
         for s in range(start_idx, end - p.cheat_pause_min_bars + 1):
             window_h = float(h.iloc[s:end + 1].max())
@@ -378,16 +392,71 @@ def _pause_zone(h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Series,
                 continue
             rng = (window_h - window_l) / mid * 100
             if rng <= p.cheat_pause_range_pct:
-                zone = {
+                zones.append({
                     "start_idx": s, "end_idx": end,
                     "high": window_h, "low": window_l,
                     "range_pct": round(rng, 1),
                     "bars": end - s + 1,
-                }
-                if best is None or zone["end_idx"] > best["end_idx"] or (
-                    zone["end_idx"] == best["end_idx"] and zone["bars"] > best["bars"]
-                ):
-                    best = zone
+                })
+    return zones
+
+
+def _cheat_pause_band(rel: float, p: PatternParams) -> str:
+    if rel < p.cheat_low_hi:
+        return "low"
+    if rel <= p.cheat_mid_hi:
+        return "mid"
+    return "rim"
+
+
+def _select_cheat_pause(zones: list[dict], h: pd.Series, left: dict, bottom: dict,
+                        n: int, p: PatternParams) -> dict | None:
+    """從合法停頓區中依 中段 ≥ 低位 ≫ 上緣 選一個;同帶內較緊、較長,最後才看新近。"""
+    base_range = left["price"] - bottom["price"]
+    if base_range <= 0:
+        return None
+    cap = left["price"] * (1 + p.cheat_right_max_over)
+    band_rank = {"low": 0, "mid": 1, "rim": 2} if p.prefer_low_over_mid else {"mid": 0, "low": 1, "rim": 2}
+    scored: list[dict] = []
+    for z in zones:
+        if not _is_recent(z["end_idx"], n, p):
+            continue
+        if float(h.iloc[bottom["idx"]:z["end_idx"] + 1].max()) > cap:
+            continue
+        base_weeks = (z["end_idx"] - left["idx"]) / 5
+        if not (p.cheat_base_min_weeks <= base_weeks <= p.cheat_base_max_weeks):
+            continue
+        pause_mid = (z["high"] + z["low"]) / 2
+        rel = (pause_mid - bottom["price"]) / base_range
+        band = _cheat_pause_band(rel, p)
+        if band == "rim" and base_weeks < p.cheat_upper_min_weeks:
+            continue
+        scored.append({**z, "rel": rel, "band": band, "base_weeks": base_weeks})
+    if not scored:
+        return None
+    scored.sort(key=lambda z: (band_rank[z["band"]], z["range_pct"], -z["bars"], -z["end_idx"]))
+    return scored[0]
+
+
+def _pause_zone(h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Series,
+                start_idx: int, p: PatternParams,
+                left: dict | None = None, bottom: dict | None = None) -> dict | None:
+    """在 start_idx 之後找盤整區。
+
+    作弊型態傳入 left/bottom 後,依中段 ≥ 低位 ≫ 上緣挑選(見 _select_cheat_pause)。
+    其餘呼叫(雙重底柄)維持舊行為:較新的 end_idx 優先,同日再取較長。
+    """
+    zones = _collect_pause_zones(h, l, c, start_idx, p)
+    if not zones:
+        return None
+    if left is not None and bottom is not None:
+        return _select_cheat_pause(zones, h, left, bottom, len(c), p)
+    best = None
+    for zone in zones:
+        if best is None or zone["end_idx"] > best["end_idx"] or (
+            zone["end_idx"] == best["end_idx"] and zone["bars"] > best["bars"]
+        ):
+            best = zone
     return best
 
 
@@ -400,6 +469,8 @@ def detect_cheat_pattern(o, h, l, c, v, p: PatternParams = PARAMS) -> dict | Non
     """作弊型態:基底(左高 → 底)+ 基底內的停頓區,pivot = 停頓區高點。
 
     停頓區在基底的相對位置決定子類型:下 1/3 低位、中 1/3 3-C、上 1/3 杯柄。
+    底部之後若同時有多個合法停頓區,優先中段,其次低位,最後上緣
+    (prefer_low_over_mid=True 時低位優於中段);同帶內先較緊、再較長、最後才看新近。
     底部之後若任何高點已高於左高 5% 以上,代表股價早已脫離基底在漲,
     這不是作弊型態(交給 VCP / 高聳旗形 / 交易帳本),避免把飆漲後的
     第一次回檔誤判成「杯柄」而把 pivot 放在最高上影線。
@@ -429,29 +500,22 @@ def detect_cheat_pattern(o, h, l, c, v, p: PatternParams = PARAMS) -> dict | Non
     if base_range <= 0:
         return None
 
-    pause = _pause_zone(h, l, c, v, bottom["idx"], p)
-    if pause is None or not _is_recent(pause["end_idx"], n, p):
+    pause = _pause_zone(h, l, c, v, bottom["idx"], p, left=left, bottom=bottom)
+    if pause is None:
         return None
 
-    # 右側上限:底部之後到停頓區結束,任何高點不得高於左高 × (1 + cheat_right_max_over)
-    cap = left["price"] * (1 + p.cheat_right_max_over)
-    if float(h.iloc[bottom["idx"]:pause["end_idx"] + 1].max()) > cap:
-        return None
-
-    base_weeks = (pause["end_idx"] - left["idx"]) / 5
-    if not (p.cheat_base_min_weeks <= base_weeks <= p.cheat_base_max_weeks):
-        return None
-
-    pause_mid = (pause["high"] + pause["low"]) / 2
-    rel = (pause_mid - bottom["price"]) / base_range  # 0=底部,1=左高
-    if rel < p.cheat_low_hi:
+    base_weeks = pause.get("base_weeks", (pause["end_idx"] - left["idx"]) / 5)
+    rel = pause.get("rel")
+    if rel is None:
+        pause_mid = (pause["high"] + pause["low"]) / 2
+        rel = (pause_mid - bottom["price"]) / base_range  # 0=底部,1=左高
+    band = pause.get("band") or _cheat_pause_band(rel, p)
+    if band == "low":
         position = CHEAT_POS_LOW
-    elif rel <= p.cheat_mid_hi:
+    elif band == "mid":
         position = CHEAT_POS_MID
     else:
         position = CHEAT_POS_UPPER
-        if base_weeks < p.cheat_upper_min_weeks:
-            return None
 
     pivot = float(pause["high"])
     pause_end_date = _bar_date(c.index, pause["end_idx"])
