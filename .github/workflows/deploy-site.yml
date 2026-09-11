@@ -6,6 +6,10 @@ on:
     paths:
       - "site/**"
       - "output/app/**"
+      - "functions/**"
+      - "wrangler.toml"
+      - "migrations/**"
+      - "scripts/inject_pages_config.py"
       - ".github/workflows/deploy-site.yml"
   workflow_dispatch:
 
@@ -19,6 +23,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +38,16 @@ jobs:
             echo "設定步驟見 README「網站版」章節。"
             exit 1
           fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install Pages Functions dependencies
+        working-directory: functions
+        run: npm ci
 
       - name: Bundle daily JSON into site/data
         run: |
@@ -46,6 +63,9 @@ jobs:
           touch site/.nojekyll
           ls -la site/data | head
 
+      - name: Inject Clerk publishable key and D1 id
+        run: python3 scripts/inject_pages_config.py
+
       # CI 無法互動建立專案；deploy 在專案不存在時會失敗 (8000007)
       - name: Ensure Cloudflare Pages project exists
         uses: cloudflare/wrangler-action@v3
@@ -56,10 +76,20 @@ jobs:
           wranglerVersion: "3.99.0"
           command: pages project create tradingvenator --production-branch=main
 
+      - name: Apply D1 schema
+        if: env.D1_DATABASE_ID != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "3.99.0"
+          command: d1 execute tradingvenator --remote --file=migrations/0001_init.sql --yes
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "3.99.0"
-          command: pages deploy site --project-name=tradingvenator --branch=main --commit-dirty=true
+          # wrangler.toml pages_build_output_dir = site (Functions live in /functions)
+          command: pages deploy --project-name=tradingvenator --branch=main --commit-dirty=true

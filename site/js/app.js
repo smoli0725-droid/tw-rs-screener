@@ -628,14 +628,61 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     RS_STORAGE.setDataBaseUrl(url);
     toast('已儲存');
     await refresh();
+    renderAccount();
   });
   $('#resetSettingsBtn').addEventListener('click', async () => {
     RS_STORAGE.clearDataBaseUrl();
     $('#dataBaseUrl').value = RS_CONFIG.DEFAULT_DATA_BASE;
     toast('已恢復預設');
     await refresh();
+    renderAccount();
   });
   $('#refreshBtn').addEventListener('click', () => refresh());
 
-  refresh();
+  function renderAccount() {
+    const el = $('#accountBody');
+    if (!el) return;
+    const user = window.RS_AUTH && window.RS_AUTH.getUser && window.RS_AUTH.getUser();
+    const plan = (window.RS_STORAGE.getPlan && window.RS_STORAGE.getPlan()) || {
+      plan: 'free',
+      plan_expires_at: null,
+    };
+    const sync = (window.RS_STORAGE.getSyncState && window.RS_STORAGE.getSyncState()) || {
+      state: 'idle',
+      error: '',
+    };
+    const email =
+      (user &&
+        (user.primaryEmailAddress?.emailAddress ||
+          user.emailAddresses?.[0]?.emailAddress)) ||
+      '—';
+    const syncLabel =
+      sync.state === 'synced'
+        ? '已同步'
+        : sync.state === 'pending'
+          ? '同步中…'
+          : sync.state === 'error'
+            ? `同步失敗${sync.error ? `：${sync.error}` : ''}`
+            : '尚未同步';
+    el.innerHTML = `<p>帳號：<strong>${esc(email)}</strong></p>
+      <p>方案：<strong>${esc(plan.plan || 'free')}</strong>${
+        plan.plan_expires_at ? `（到期 ${esc(plan.plan_expires_at)}）` : ''
+      }</p>
+      <p>雲端資料：<strong>${esc(syncLabel)}</strong></p>
+      <p class="hint">持股與設定會同步到雲端；billing 尚未開放，方案預設為 free。</p>`;
+  }
+
+  window.RS_APP = {
+    start: async () => {
+      const input = $('#dataBaseUrl');
+      if (input) input.value = RS_STORAGE.getDataBaseUrl();
+      renderAccount();
+      await refresh();
+      renderAccount();
+    },
+    refresh,
+    renderPortfolio,
+    renderAccount,
+    toast,
+  };
 })();

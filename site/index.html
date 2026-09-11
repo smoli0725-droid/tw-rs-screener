@@ -6,6 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#0b3d4a" />
   <title>TradingVenator</title>
+  <meta name="clerk-publishable-key" content="__CLERK_PUBLISHABLE_KEY__" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -13,7 +14,27 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
 </head>
-<body>
+<body class="signed-out">
+  <div id="auth-gate" class="auth-gate">
+    <div class="auth-card">
+      <div class="brand auth-brand">
+        <div class="brand-mark">TV</div>
+        <div>
+          <div class="brand-title">TradingVenator</div>
+          <div class="meta-line">登入後才能查看持股、RS 與型態</div>
+        </div>
+      </div>
+      <div id="auth-loading" class="auth-loading">載入登入畫面…</div>
+      <div id="auth-setup" class="auth-setup" hidden>
+        <h2>尚未設定 Clerk</h2>
+        <p data-setup-msg class="hint"></p>
+        <p class="hint">在 Clerk Dashboard 建立應用（Email magic link + Google），把 Publishable Key 寫入 GitHub secret <code>CLERK_PUBLISHABLE_KEY</code> 後重新部署。步驟見 README。</p>
+      </div>
+      <div id="sign-in" hidden></div>
+    </div>
+  </div>
+
+  <div class="app-shell">
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark">TV</div>
@@ -22,7 +43,10 @@
         <div id="metaLine" class="meta-line">載入資料中…</div>
       </div>
     </div>
-    <button id="refreshBtn" class="ghost-btn" type="button">↻</button>
+    <div class="topbar-actions">
+      <button id="refreshBtn" class="ghost-btn" type="button">↻</button>
+      <div id="userButton" class="user-button"></div>
+    </div>
   </header>
 
   <main>
@@ -37,7 +61,7 @@
         <button id="metricsBtn" class="ghost-btn" type="button">績效</button>
       </div>
       <div id="positionList" class="list"></div>
-      <p class="hint">持股存在瀏覽器 localStorage。iPhone 請用 Safari「加入主畫面」以免資料分散。</p>
+      <p class="hint">持股會同步到雲端（本機 localStorage 僅作快取）。</p>
     </section>
 
     <section id="view-recommend" class="view">
@@ -92,6 +116,10 @@
     </section>
 
     <section id="view-settings" class="view">
+      <div class="card" id="accountCard">
+        <h3>帳號</h3>
+        <div id="accountBody" class="hint">載入中…</div>
+      </div>
       <div class="card" id="dataStatusCard">
         <h3>資料狀態</h3>
         <div id="dataStatusBody" class="hint">載入中…</div>
@@ -197,11 +225,15 @@
     </div>
   </dialog>
 
+  </div>
+
   <script src="js/config.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/api.js"></script>
   <script src="js/data.js"></script>
   <script src="js/portfolio.js"></script>
   <script src="js/chart.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
 </body>
 </html>

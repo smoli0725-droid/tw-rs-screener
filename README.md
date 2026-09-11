@@ -91,12 +91,13 @@ https://raw.githubusercontent.com/smoli0725-droid/tw-rs-screener/main/output/app
 Private repo 也能用（不必把 GitHub 改成 Public）。
 
 功能對應 App：
-- 持股（存在瀏覽器 localStorage）
-- RS≥85 總表、型態／即將突破
-- K 線
+- **整站需登入**（Clerk：Email magic link + Google）。未登入只看得到登入畫面，看不到 RS／型態／持股
+- 持股與設定同步到雲端（D1）；本機 localStorage 只當快取。第一次登入會把既有 localStorage 上傳
+- RS≥85 總表、型態／即將突破、K 線
 - 設定資料來源（預設 `./data`）
+- 帳號方案欄位 `plan`（預設 `free`）、`plan_expires_at`（目前無收費）
 
-### 第一次設定（約 5 分鐘）
+### 第一次設定（Cloudflare Pages）
 
 1. 註冊免費帳號：https://dash.cloudflare.com/sign-up
 2. **先建立空專案**（名稱必須完全一致）：  
@@ -105,9 +106,9 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
 3. 建立 API Token：  
    https://dash.cloudflare.com/profile/api-tokens  
    → **Create Token** → 使用範本 **Edit Cloudflare Workers**  
-   （權限需含 Account / Cloudflare Pages / Edit；Account Resources 選你的帳號）
+   （權限需含 Account / Cloudflare Pages / Edit；若要讓 Actions 建 D1／跑 migration，再加 **Account / D1 / Edit**；Account Resources 選你的帳號）
 4. 複製 **Account ID**：Dashboard 右側 Overview 可看到
-5. 回到 GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**，新增兩個：
+5. 回到 GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**，新增：
    - `CLOUDFLARE_API_TOKEN` = 剛才的 token
    - `CLOUDFLARE_ACCOUNT_ID` = Account ID
 6. **Actions → Deploy Web Site → Run workflow**
@@ -116,9 +117,109 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
 
 > 若 Actions 出現 `Project not found [code: 8000007]`，就是還沒建立名為 `tradingvenator` 的 Pages 專案。
 
-之後每日 RS Actions 更新 `output/app/`，或你改 `site/`，都會自動重新部署。
+之後每日 RS Actions 更新 `output/app/`，或你改 `site/` / `functions/`，都會自動重新部署。
 
-本地預覽：
+### Authentication + cloud sync（Clerk + D1）
+
+未完成下列步驟時：網站會顯示「尚未設定 Clerk」；API 在缺少 D1／secret 時回 503。不會把金鑰寫進 git。
+
+#### 1) Clerk Dashboard
+
+English / 中文步驟相同：
+
+1. Open [dashboard.clerk.com](https://dashboard.clerk.com) → **Create application**（名稱例如 `TradingVenator`）
+2. **Sign-in options**
+   - Enable **Email**（magic link / email code；可關 password）
+   - Enable **Google**
+3. **Configure → Domains / Paths**
+   - Allowed origins / home URL 加上：
+     - `https://tradingvenator.pages.dev`
+     - `http://localhost:8788`（`wrangler pages dev`）
+     - `http://localhost:8080`（靜態預覽）
+   - Redirect URLs 同樣允許上述 origin（hash routing，sign-in 在 `/`）
+4. **API keys** 複製：
+   - Publishable key（`pk_test_…` / `pk_live_…`）
+   - Secret key（`sk_test_…` / `sk_live_…`）— 只放 Cloudflare / GitHub secrets
+   - 可選：**Show JWT public key** → PEM，存成 `CLERK_JWT_KEY`（Functions 可離線驗 token）
+
+Production instance 請改用 `pk_live_` / `sk_live_`。
+
+#### 2) Cloudflare D1
+
+在有 `CLOUDFLARE_API_TOKEN` 的環境（本機或 CI）：
+
+```bash
+npx wrangler d1 create tradingvenator
+# 複製輸出的 database_id
+npx wrangler d1 execute tradingvenator --remote --file=migrations/0001_init.sql
+```
+
+`wrangler.toml` 的 `[[d1_databases]]` binding 名稱是 **`DB`**。Deploy workflow 會用 GitHub secret `D1_DATABASE_ID` 取代 placeholder；沒設這個 secret 時仍會部署網站，但 `/api/*` 沒有資料庫。
+
+#### 3) GitHub + Pages secrets
+
+GitHub → **Settings → Secrets and variables → Actions**：
+
+| Secret | 用途 |
+|---|---|
+| `CLERK_PUBLISHABLE_KEY` | 部署時寫入 `site/js/config.js`、`<meta>`、`wrangler.toml [vars]` |
+| `CLERK_SECRET_KEY` | **不要**進前端。放到 Cloudflare Pages secret（見下） |
+| `CLERK_JWT_KEY` | 可選，PEM 公鑰 |
+| `D1_DATABASE_ID` | `wrangler d1 create` 得到的 UUID |
+
+Cloudflare → Pages → **tradingvenator** → Settings → Environment variables（Production **and** Preview）：
+
+```bash
+npx wrangler pages secret put CLERK_SECRET_KEY --project-name=tradingvenator
+# optional
+npx wrangler pages secret put CLERK_JWT_KEY --project-name=tradingvenator
+```
+
+`CLERK_PUBLISHABLE_KEY` 由每次 deploy 寫進 wrangler `[vars]`，不必再在 Dashboard 設一次。
+
+若之後接自訂網域，請加到：(1) Clerk allowed origins (2) `functions/_lib/cors.js` 的 production origin 或 Pages env `ALLOWED_ORIGINS`。
+
+### 怎麼驗證 / How to verify
+
+**本機（建議，含 API）**
+
+```bash
+cp -r output/app site/data
+cp .dev.vars.example .dev.vars   # 填入 pk_ / sk_
+cd functions && npm ci && cd ..
+npx wrangler d1 execute tradingvenator --local --file=migrations/0001_init.sql
+npx wrangler pages dev
+```
+
+1. 打開 wrangler 印出的 URL（通常 `http://localhost:8788`）
+2. 未登入：只能看到登入畫面，看不到持股／RS
+3. Email magic link 或 Google 登入後出現主畫面與右上角 UserButton
+4. 新增一筆持股 → 重新整理後還在；DevTools → Network 應有 `GET /api/me`、`PUT /api/data`（`Authorization: Bearer …`）
+5. 未帶 token 呼叫 API 應為 401：
+   `curl -i http://localhost:8788/api/me`
+
+僅靜態預覽（**沒有** Functions / 同步）：
+
+```bash
+cp -r output/app site/data
+# 可把 site/js/config.js 的 __CLERK_PUBLISHABLE_KEY__ 換成 pk_test_…
+cd site && python3 -m http.server 8080
+```
+
+**Pages（secrets 設好並重新 Run workflow 之後）**
+
+1. `https://tradingvenator.pages.dev` 未登入被擋
+2. 登入後設定頁顯示帳號 email 與 `plan: free`
+3. 持股在另一個瀏覽器登入同一帳號後會出現（雲端同步）
+
+### 架構摘要
+
+- Frontend：`site/js/auth.js` 載入 `@clerk/clerk-js` CDN；`storage.js` 登入後拉雲端、變更時 PUT
+- Backend：Cloudflare Pages Functions（`functions/api/me.js`、`functions/api/data.js`）用 `@clerk/backend` `authenticateRequest`
+- CORS 只允許 `https://tradingvenator.pages.dev` 與 localhost
+- 每日 RS Python pipeline（`rs_calculator.py` / `daily_rs.yml`）與 Flutter App **沒有**改動
+
+本地預覽（舊的純靜態方式仍可用，但沒有 API）：
 
 ```bash
 cp -r output/app site/data
@@ -133,4 +234,4 @@ cd site && python3 -m http.server 8080
 - Yahoo Finance 偶爾漏個別上櫃股或暫時限流;workflow 失敗時備援時段 / 隔天會再跑
 - RS 是「相對強度排名」,不是買進訊號——請搭配型態與量價條件
 - 型態偵測為啟發式量化,門檻集中在 `pattern_screener.py` 的 `PatternParams`
-- 每日 commit `output/app/` 會讓 repo 隨時間變大;必要時可改推到獨立 data 分支
+- 網站版整站需 Clerk 登入；未設定 Publishable Key 時只會看到設定提示，不會顯示 RS 名單

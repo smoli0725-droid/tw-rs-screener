@@ -33,6 +33,8 @@ body {
   background: rgba(243, 247, 245, 0.92);
   border-bottom: 1px solid var(--line);
 }
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+.user-button { display: flex; align-items: center; min-height: 36px; }
 .brand { display: flex; gap: 12px; align-items: center; }
 .brand-mark {
   width: 42px; height: 42px; border-radius: 12px;
@@ -92,8 +94,8 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 20px; }
 .vol-tag { font-weight: 600; }
 .vol-shrink { color: var(--down); }
 .vol-expand { color: var(--warn); }
-#dataStatusCard h3 { margin: 0 0 8px; font-size: 1rem; }
-#dataStatusCard p { margin: 4px 0; }
+#dataStatusCard h3, #accountCard h3 { margin: 0 0 8px; font-size: 1rem; }
+#dataStatusCard p, #accountCard p { margin: 4px 0; }
 .market-card { margin-bottom: 12px; display: flex; align-items: center; gap: 14px; }
 .market-rate { font-size: 1.9rem; font-weight: 700; line-height: 1; min-width: 92px; }
 .market-rate.good { color: var(--down); }
@@ -166,3 +168,32 @@ dialog::backdrop { background: rgba(8, 30, 36, 0.45); }
   background: #0b3d4a; color: #fff; padding: 10px 14px; border-radius: 999px;
   z-index: 99; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.2);
 }
+
+.app-shell { display: none; }
+body.signed-in .app-shell { display: block; }
+body.signed-out { padding-bottom: 0; }
+.auth-gate {
+  display: none;
+  position: fixed; inset: 0; z-index: 200;
+  align-items: center; justify-content: center;
+  padding: 24px 16px;
+  overflow: auto;
+  background:
+    radial-gradient(1100px 420px at 8% -8%, #cfe8e2 0%, transparent 55%),
+    radial-gradient(900px 380px at 100% 0%, #dce7f2 0%, transparent 50%),
+    var(--paper);
+}
+body.signed-out .auth-gate { display: flex; }
+.auth-card {
+  width: min(420px, 100%);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 22px 18px 24px;
+}
+.auth-brand { margin-bottom: 16px; }
+.auth-loading, .auth-setup { color: var(--muted); text-align: center; padding: 28px 8px; }
+.auth-setup h2 { margin: 0 0 8px; color: var(--ink); font-size: 1.15rem; }
+#sign-in { min-height: 280px; }
+#sign-in .cl-rootBox { margin: 0 auto; width: 100%; }
