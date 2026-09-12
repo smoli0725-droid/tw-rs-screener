@@ -76,8 +76,10 @@ jobs:
           wranglerVersion: "3.99.0"
           command: pages project create tradingvenator --production-branch=main
 
+      # Schema already applied via dashboard/MCP; token may lack D1 Edit — don't block Pages deploy
       - name: Apply D1 schema
         if: env.D1_DATABASE_ID != ''
+        continue-on-error: true
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
