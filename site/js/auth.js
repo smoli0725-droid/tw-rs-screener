@@ -8,8 +8,13 @@ window.RS_AUTH = (() => {
   function publishableKey() {
     const fromMeta = document.querySelector('meta[name="clerk-publishable-key"]');
     const metaVal = fromMeta && fromMeta.getAttribute('content');
-    const key = (window.RS_CONFIG && window.RS_CONFIG.CLERK_PUBLISHABLE_KEY) || metaVal || '';
-    return String(key).trim();
+    const fromConfig = window.RS_CONFIG && window.RS_CONFIG.CLERK_PUBLISHABLE_KEY;
+    const candidates = [fromConfig, metaVal];
+    for (const raw of candidates) {
+      const key = String(raw || '').trim();
+      if (isConfigured(key)) return key;
+    }
+    return String(fromConfig || metaVal || '').trim();
   }
 
   function isConfigured(key) {
@@ -27,45 +32,86 @@ window.RS_AUTH = (() => {
     }
   }
 
-  function loadScript(src) {
+  function describeScriptUrl(src) {
+    try {
+      const u = new URL(src, window.location && window.location.href);
+      return `${u.host}${u.pathname}`;
+    } catch {
+      return 'unknown-url';
+    }
+  }
+
+  function redactSecrets(text, pk) {
+    let out = String(text || '');
+    if (pk) out = out.split(pk).join('pk_***');
+    return out;
+  }
+
+  function isClerkInstance(value) {
+    return Boolean(value) && typeof value.load === 'function';
+  }
+
+  function supplyPublishableKey(pk) {
+    // clerk.browser.js auto-inits with:
+    //   script[data-clerk-publishable-key] || window.__clerk_publishable_key
+    // Empty key makes the constructor throw and leaves window.Clerk unset.
+    window.__clerk_publishable_key = pk;
+  }
+
+  function loadScript(src, pk) {
     return new Promise((resolve, reject) => {
+      const label = describeScriptUrl(src);
+      const fail = () => reject(new Error(`Failed to load ${label}`));
       const existing = document.querySelector(`script[src="${src}"]`);
       if (existing) {
-        if (existing.dataset.loaded === '1' || window.Clerk) return resolve();
-        existing.addEventListener('load', () => resolve());
-        existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
+        existing.setAttribute('data-clerk-publishable-key', pk);
+        if (isClerkInstance(window.Clerk) || existing.dataset.loaded === '1') {
+          return resolve(label);
+        }
+        existing.addEventListener('load', () => resolve(label));
+        existing.addEventListener('error', fail);
         return;
       }
       const script = document.createElement('script');
       script.src = src;
       script.async = true;
       script.crossOrigin = 'anonymous';
+      script.setAttribute('data-clerk-publishable-key', pk);
       script.onload = () => {
         script.dataset.loaded = '1';
-        resolve();
+        resolve(label);
       };
-      script.onerror = () => reject(new Error(`Failed to load ${src}`));
+      script.onerror = fail;
       document.head.appendChild(script);
     });
   }
 
-  async function loadClerkLibrary(pk) {
+  function clerkScriptUrls(pk) {
     const fapi = frontendApiFromKey(pk);
     const urls = [];
     if (fapi) {
       urls.push(`https://${fapi}/npm/@clerk/clerk-js@5/dist/clerk.browser.js`);
     }
     urls.push('https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js');
-    let lastErr;
+    urls.push('https://unpkg.com/@clerk/clerk-js@5/dist/clerk.browser.js');
+    return urls;
+  }
+
+  async function loadClerkLibrary(pk) {
+    supplyPublishableKey(pk);
+    const urls = clerkScriptUrls(pk);
+    const failures = [];
     for (const url of urls) {
+      const label = describeScriptUrl(url);
       try {
-        await loadScript(url);
-        if (window.Clerk) return;
+        await loadScript(url, pk);
+        if (isClerkInstance(window.Clerk)) return label;
+        failures.push(`${label}: loaded but window.Clerk instance missing`);
       } catch (err) {
-        lastErr = err;
+        failures.push(redactSecrets(err && err.message, pk) || `${label}: failed`);
       }
     }
-    throw lastErr || new Error('Failed to load Clerk');
+    throw new Error(`Failed to load Clerk (${failures.join('; ') || 'no script URLs'})`);
   }
 
   function showSetup(message) {
@@ -164,10 +210,10 @@ window.RS_AUTH = (() => {
     }
     try {
       await loadClerkLibrary(pk);
-      if (typeof window.Clerk === 'function') {
-        clerk = new window.Clerk(pk);
-      } else {
-        clerk = window.Clerk;
+      // clerk.browser.js constructs window.Clerk during script eval. Do not treat it as a constructor.
+      clerk = window.Clerk;
+      if (!isClerkInstance(clerk)) {
+        throw new Error('Clerk script loaded but window.Clerk instance is missing');
       }
       await clerk.load({
         appearance: {
@@ -188,7 +234,7 @@ window.RS_AUTH = (() => {
       });
     } catch (err) {
       console.error(err);
-      showSetup(`Clerk 載入失敗：${err.message || err}`);
+      showSetup(`Clerk 載入失敗：${redactSecrets(err && err.message ? err.message : err, pk)}`);
     }
   }
 
