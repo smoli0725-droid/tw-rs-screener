@@ -1,0 +1,17 @@
+# Cloudflare Pages — TradingVenator
+# Replace __D1_DATABASE_ID__ (or set GitHub secret D1_DATABASE_ID) after:
+#   npx wrangler d1 create tradingvenator
+# CLERK_PUBLISHABLE_KEY is injected at deploy time. Never put CLERK_SECRET_KEY here.
+
+name = "tradingvenator"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "site"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tradingvenator"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[vars]
+CLERK_PUBLISHABLE_KEY = "__CLERK_PUBLISHABLE_KEY__"

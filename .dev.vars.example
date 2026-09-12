@@ -1,0 +1,7 @@
+# Local Wrangler / Pages Functions secrets (never commit the real file)
+CLERK_PUBLISHABLE_KEY=pk_test_REPLACE_ME
+CLERK_SECRET_KEY=sk_test_REPLACE_ME
+# Optional PEM from Clerk Dashboard → API keys → Show JWT public key
+# CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+# Optional extra CORS origins, comma-separated
+# ALLOWED_ORIGINS=https://custom-domain.example

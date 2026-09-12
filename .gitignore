@@ -3,3 +3,7 @@
 __pycache__/
 .pytest_cache/
 site/data/
+node_modules/
+.wrangler/
+.dev.vars
+functions/.wrangler/
