@@ -1,9 +1,9 @@
 {
   "data_date": "2026-09-14",
-  "generated_at": "2026-09-14T23:44:10.808314+08:00",
+  "generated_at": "2026-09-15T00:29:14.162612+08:00",
   "is_fresh": true,
   "is_trading_day": true,
-  "source_checked_at": "2026-09-14T23:44:02.800062+08:00",
+  "source_checked_at": "2026-09-15T00:29:03.968016+08:00",
   "message": "fresh（TWSE 快照 2026-09-11 尚未更新,略過交叉比價）",
   "twse_cross_check": {
     "ok": true,
@@ -14,11 +14,11 @@
   },
   "counts": {
     "rs85": 291,
-    "patterns": 30,
-    "pattern_symbols": 30,
-    "near_breakout": 2,
-    "broke_out": 5,
-    "ohlcv_symbols": 67,
+    "patterns": 32,
+    "pattern_symbols": 32,
+    "near_breakout": 8,
+    "broke_out": 1,
+    "ohlcv_symbols": 66,
     "universe": 1961
   },
   "market": {
@@ -28,7 +28,7 @@
     "wins": 14,
     "losses": 9,
     "pending": 20,
-    "recovered": 0,
+    "recovered": 4,
     "win_rate": 0.609,
     "label": "市況良好",
     "rules": {
