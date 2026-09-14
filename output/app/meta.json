@@ -1,16 +1,24 @@
 {
   "data_date": "2026-09-14",
-  "generated_at": "2026-09-15T01:33:36.223247+08:00",
+  "generated_at": "2026-09-15T01:42:38.771018+08:00",
   "is_fresh": true,
-  "is_trading_day": true,
-  "source_checked_at": "2026-09-15T01:33:28.014259+08:00",
-  "message": "fresh（TWSE 快照 2026-09-11 尚未更新,略過交叉比價）",
+  "is_trading_day": false,
+  "source_checked_at": "2026-09-15T01:42:29.529864+08:00",
+  "message": "今日盤未收(台北 01:42),沿用 2026-09-14",
   "twse_cross_check": {
     "ok": true,
-    "skipped": true,
-    "reason": "twse_stale",
+    "reason": "before_session_close",
+    "twse_date": "2026-09-11"
+  },
+  "price_overlay": {
+    "applied": false,
+    "source": null,
     "twse_date": "2026-09-11",
-    "mismatches": []
+    "yahoo_date": "2026-09-14",
+    "listed_filled": 0,
+    "appended_row": false,
+    "taiex_filled": false,
+    "message": "twse_not_today"
   },
   "counts": {
     "rs85": 291,
