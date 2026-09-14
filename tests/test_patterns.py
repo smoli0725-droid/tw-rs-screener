@@ -866,7 +866,7 @@ def test_check_freshness_skips_stale_twse_snapshot(monkeypatch):
 
 
 def test_check_freshness_same_date_price_mismatch(monkeypatch):
-    """TWSE 已是當日檔且抽樣價差 >3% → 仍應判定 Yahoo 不可用。"""
+    """TWSE 已是當日檔且抽樣價差 >3%,但 Yahoo 序列已是今天 → 不擋(避免還原價誤殺)。"""
     today = dt.date(2026, 9, 7)
     dates = _dates(2, end=today)
     close = pd.DataFrame({
@@ -878,13 +878,14 @@ def test_check_freshness_same_date_price_mismatch(monkeypatch):
     twse = _twse_day_all("1150907", {
         "2330": "2410.00",  # 與 Yahoo 差 2.07% → 通過 3% 門檻
         "2317": "256.00",
-        "2454": "4415.00",  # 與 Yahoo 差 7.8% → 失敗
+        "2454": "4415.00",  # 與 Yahoo 差 7.8%
     })
     monkeypatch.setattr("rs_calculator.fetch_twse_day_all", lambda: twse)
 
     r = check_freshness(close, twii, today=today, skip=False)
-    assert r["is_fresh"] is False
+    assert r["is_fresh"] is True
     assert r["twse_cross_check"]["ok"] is False
+    assert r["twse_cross_check"]["warning"] is True
     assert r["twse_cross_check"]["twse_date"] == "2026-09-07"
     assert any(m["id"] == "2454" for m in r["twse_cross_check"]["mismatches"])
 

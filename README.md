@@ -46,9 +46,31 @@ score = 2×(3個月報酬) + (6個月) + (9個月) + (12個月)
 - 門檻集中在 `PatternParams`(`buy_zone_pct`、`success_pct`、`fail_pct`、`recent_bars`、`breakout_window_bars`)
 
 ## 每日自動更新(含資料新鮮度保護)
-- 排程:台北 **17:00 / 18:30 / 20:00**(主跑 + 備援)。若 `資料日期.txt` 已是今天則跳過。
-- Yahoo 資料若落後當日交易日,會以 TWSE OpenAPI 確認後**失敗退出、不 commit 舊資料**,等備援時段重試。
-- 手動跑:Actions → Daily Taiwan RS Update → **Run workflow**
+
+排程(週一到週五,台北時間):**17:30 / 18:00 / 18:30 / 19:00 / 19:30 / 20:00 / 20:30 / 21:00 / 21:30**。
+若 `output/資料日期.txt` 已是今天則跳過,所以多時段只會成功 commit 一次。
+
+**不要指望 17:00 準點。** GitHub Actions 的 `schedule` cron 不保證準時(常見延遲數十分鐘,有時約數小時);而且 17:00 時 Yahoo 與 TWSE `STOCK_DAY_ALL` 經常還停在前一交易日,新鮮度檢查會失敗等下一檔。本 workflow 從 17:30 開始、拉長到 21:30,並在 Yahoo 落後時用 **TWSE 上市收盤快照補當日 K 線**。若 cron 拖到台北次日凌晨,14:00 前會沿用上一交易日,避免整晚白跑。
+
+手動跑:GitHub → **Actions** → **Daily Taiwan RS Update** → **Run workflow**。
+
+需要更準點時,用外部 cron 打 `workflow_dispatch`(仍不要把 token 寫進 repo):
+
+```bash
+gh workflow run daily_rs.yml --repo smoli0725-droid/tw-rs-screener
+```
+
+價格來源(當日收盤):
+
+1. **Yahoo Finance**:歷史 OHLCV(還原權息)與上櫃 `.TWO`;收盤後常落後
+2. **TWSE OpenAPI `STOCK_DAY_ALL`**:上市官方未還原 OHLCV;快照日期已是今天時,覆蓋/補上上市最後一根,並嘗試用 `MI_INDEX` 的發行量加權補 `^TWII`
+3. **富邦 Neo**(尚未實作):帳號就緒後在 `rs_calculator.fetch_neo_day_all()` 接入,可同時補上市+上櫃;憑證只放 Actions secrets
+
+上櫃不在 TWSE 快照裡,Yahoo 若還沒今日檔,TPEX 當日列會是空的(RS 會 ffill 成昨日收盤;型態偵測沿用上一根)。除權息當日,TWSE 未還原收盤與 Yahoo 還原歷史拼在同一序列,單日報酬可能有落差。
+
+平日若 Yahoo 與 TWSE 都還沒有今日檔,程式以 exit 2 結束、**不 commit 舊資料**,等下一個時段。Yahoo 已是今天時,即使抽樣價與 TWSE 差 >3% 也不再擋下(避免還原價誤殺)。
+
+`output/` 的 commit 若與 `main` 上既有 RS 產物衝突,會改以「剛算完的 `output/`」為準 rebase/重放,不會 `--force` push `main`。
 
 ```bash
 python rs_calculator.py          # 正式
@@ -231,7 +253,8 @@ cd site && python3 -m http.server 8080
 - iOS:背景執行時機由系統決定,不保證準點;會排程本地通知,開啟 App 仍會立即刷新。
 
 ## 已知限制
-- Yahoo Finance 偶爾漏個別上櫃股或暫時限流;workflow 失敗時備援時段 / 隔天會再跑
+- Yahoo Finance 偶爾漏個別上櫃股或暫時限流;上市當日收盤改以 TWSE 快照補,上櫃仍靠 Yahoo,失敗時由後續時段重試
+- GitHub cron 不準點;要準時請用外部排程觸發 `workflow_dispatch`(見上方)
 - RS 是「相對強度排名」,不是買進訊號——請搭配型態與量價條件
 - 型態偵測為啟發式量化,門檻集中在 `pattern_screener.py` 的 `PatternParams`
 - 網站版整站需 Clerk 登入；未設定 Publishable Key 時只會看到設定提示，不會顯示 RS 名單

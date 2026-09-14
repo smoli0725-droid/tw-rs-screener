@@ -20,6 +20,9 @@ RS:score = 2*(3月報酬) + (6月) + (9月) + (12月) → 全市場百分位 1�
   output/RS_全市場排名.xlsx  ← 三個分頁
   output/app/*.json         ← Flutter App 資料
 
+當日收盤:Yahoo 歷史(含上櫃) + TWSE STOCK_DAY_ALL 補上市最後一根;
+上櫃與還原價限制見 README。富邦 Neo 尚未接入(fetch_neo_day_all)。
+
 用法:
   python rs_calculator.py          # 正式執行
   python rs_calculator.py --test   # 合成資料測試
@@ -35,11 +38,20 @@ import pandas as pd
 
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
 TWSE_DAY_ALL = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+TWSE_MI_INDEX = "https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX"
 EXCLUDE_INDUSTRY = {"ETF", "ETN", "受益證券", "存託憑證", "上市指數投資證券(ETN)"}
 TRADING_DAYS = {"3m": 63, "6m": 126, "9m": 189, "12m": 252}
 MIN_HISTORY = 130        # 至少約半年資料才納入 RS 排名
 MIN_AVG_VOL_ZHANG = 200  # 樣板名單的 20 日均量門檻(張),依個人資金規模調整
 FRESHNESS_SAMPLE_IDS = ("2330", "2317", "2454")
+TAIPEI_TZ = dt.timezone(dt.timedelta(hours=8))
+# Same-day close sources (priority when wiring new ones):
+#   1. TWSE STOCK_DAY_ALL — listed official unadjusted OHLCV (implemented)
+#   2. Yahoo Finance — history + TPEX (.TWO); lags after 13:30 close
+#   3. Fubon Neo — not implemented; see fetch_neo_day_all()
+PRICE_SOURCE_TWSE = "twse"
+PRICE_SOURCE_YAHOO = "yahoo"
+PRICE_SOURCE_NEO = "neo"  # reserved; do not log in / scrape Neo in this module
 
 
 # ---------------------------------------------------------------- 股票池
@@ -110,6 +122,11 @@ def fetch_index() -> pd.Series:
 
 
 # ---------------------------------------------------------------- 資料新鮮度
+def taipei_today() -> dt.date:
+    """Actions runner 是 UTC;新鮮度與資料日期一律用台北曆日。"""
+    return dt.datetime.now(TAIPEI_TZ).date()
+
+
 def fetch_twse_day_all() -> pd.DataFrame | None:
     """抓 TWSE 當日全市場收盤價;失敗回傳 None。"""
     import requests
@@ -123,6 +140,42 @@ def fetch_twse_day_all() -> pd.DataFrame | None:
     except Exception as e:
         print(f"[freshness] TWSE OpenAPI 失敗: {e}", flush=True)
         return None
+
+
+def fetch_twse_taiex() -> tuple[dt.date | None, float | None]:
+    """TWSE 發行量加權股價指數收盤。失敗回傳 (None, None)。"""
+    import requests
+    try:
+        r = requests.get(TWSE_MI_INDEX, timeout=30)
+        r.raise_for_status()
+        rows = r.json()
+        if not isinstance(rows, list):
+            return None, None
+        for row in rows:
+            if row.get("指數") == "發行量加權股價指數":
+                return _parse_twse_date(row.get("日期")), _parse_twse_price(row.get("收盤指數"))
+    except Exception as e:
+        print(f"[prices] TWSE TAIEX 失敗: {e}", flush=True)
+    return None, None
+
+
+def fetch_neo_day_all() -> pd.DataFrame | None:
+    """Fubon Neo same-day quotes — not implemented.
+
+    Leave this as the extension point. Do not add login, cookies, or
+    credentials here until a Neo account exists and secrets live in
+    GitHub Actions (never in git).
+
+    Expected DataFrame columns (same as STOCK_DAY_ALL so
+    ``apply_twse_snapshot`` can be reused or generalized):
+      Code, Date, OpeningPrice, HighestPrice, LowestPrice,
+      ClosingPrice, TradeVolume
+
+    Wire-up later in ``resolve_same_day_prices``: call this, and if it
+    returns today's rows, overlay listed *and* TPEX (Yahoo ``.TWO``
+    still lags). Prefer Neo over TWSE when both exist.
+    """
+    return None
 
 
 def _parse_twse_price(val) -> float | None:
@@ -168,21 +221,205 @@ def _twse_snapshot_date(twse: pd.DataFrame) -> dt.date | None:
 
 def is_likely_trading_day(today: dt.date | None = None) -> bool:
     """粗判今天是否為台股交易日(週一到週五;假日另用 TWSE 資料確認)。"""
-    today = today or dt.date.today()
+    today = today or taipei_today()
     return today.weekday() < 5
+
+
+def _index_timestamp(index: pd.Index, d: dt.date) -> pd.Timestamp:
+    """對齊既有 DatetimeIndex 上同一曆日的標籤;沒有則新建。"""
+    for existing in reversed(list(index)):
+        try:
+            if pd.Timestamp(existing).date() == d:
+                return pd.Timestamp(existing)
+        except (TypeError, ValueError):
+            continue
+    ts = pd.Timestamp(d)
+    tz = getattr(index, "tz", None)
+    if tz is not None:
+        ts = ts.tz_localize(tz)
+    return ts
+
+
+def _ensure_date_row(df: pd.DataFrame, ts: pd.Timestamp) -> pd.DataFrame:
+    if ts in df.index:
+        return df
+    new_index = df.index.union(pd.Index([ts]), sort=True)
+    return df.reindex(new_index)
+
+
+def _ensure_date_value(s: pd.Series, ts: pd.Timestamp) -> pd.Series:
+    if ts in s.index:
+        return s
+    new_index = s.index.union(pd.Index([ts]), sort=True)
+    return s.reindex(new_index)
+
+
+def _sample_price_mismatches(close: pd.DataFrame, twse: pd.DataFrame,
+                             rel_tol: float = 0.03) -> list[dict]:
+    """Only meaningful when TWSE snapshot date == last close index date."""
+    mismatches = []
+    codes = twse["Code"].astype(str) if "Code" in twse.columns else pd.Series(dtype=str)
+    for sid in FRESHNESS_SAMPLE_IDS:
+        row = twse[codes == sid]
+        if row.empty:
+            continue
+        twse_px = _parse_twse_price(row.iloc[0].get("ClosingPrice"))
+        yf_col = f"{sid}.TW"
+        if twse_px is None or yf_col not in close.columns:
+            continue
+        yf_px = float(close[yf_col].iloc[-1])
+        if not np.isfinite(yf_px) or twse_px <= 0:
+            continue
+        if abs(yf_px / twse_px - 1) > rel_tol:
+            mismatches.append({"id": sid, "twse": twse_px, "yahoo": yf_px})
+    return mismatches
+
+
+def apply_twse_snapshot(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
+                        twii: pd.Series, twse: pd.DataFrame | None,
+                        today: dt.date | None = None,
+                        taiex_close: float | None = None) -> tuple:
+    """用 TWSE 當日官方 OHLCV 覆蓋/補上市股最後一根。
+
+    只在快照日期 == 台北「今天」時套用,避免把昨日 TWSE 寫進 Yahoo 已有的今日列。
+    上櫃 (.TWO) 不在 STOCK_DAY_ALL,維持 Yahoo;若補了新的一日列,上櫃該列為 NaN
+    (RS 計算會 ffill,型態偵測 dropna 後沿用上一根)。
+
+    TWSE 收盤為未還原價。Yahoo 歷史列仍是 auto_adjust;最後一根官方收盤與
+    Yahoo 慣例(最新收盤=未還原)一致,除權息當日仍可能和還原序列有落差。
+    """
+    today = today or taipei_today()
+    overlay = {
+        "applied": False,
+        "source": None,
+        "twse_date": None,
+        "yahoo_date": None,
+        "listed_filled": 0,
+        "appended_row": False,
+        "taiex_filled": False,
+        "message": "no_twse",
+    }
+    if close is None or close.empty:
+        overlay["message"] = "empty_close"
+        return ohlcv, close, volume, twii, overlay
+
+    overlay["yahoo_date"] = pd.Timestamp(close.index[-1]).date().isoformat()
+    if twse is None or twse.empty:
+        return ohlcv, close, volume, twii, overlay
+
+    twse_date = _twse_snapshot_date(twse)
+    overlay["twse_date"] = twse_date.isoformat() if twse_date else None
+    if twse_date is None:
+        overlay["message"] = "twse_date_unparsed"
+        return ohlcv, close, volume, twii, overlay
+    if twse_date != today:
+        overlay["message"] = "twse_not_today"
+        return ohlcv, close, volume, twii, overlay
+
+    close = close.copy()
+    volume = volume.copy()
+    twii = twii.copy()
+    ohlcv = {k: v.copy() for k, v in ohlcv.items()}
+    ohlcv["Close"] = close
+    ohlcv["Volume"] = volume
+
+    ts = _index_timestamp(close.index, twse_date)
+    appended = ts not in close.index
+    if appended:
+        ohlcv = {k: _ensure_date_row(df, ts) for k, df in ohlcv.items()}
+        close = ohlcv["Close"]
+        volume = ohlcv["Volume"]
+        twii = _ensure_date_value(twii, ts)
+        overlay["appended_row"] = True
+
+    filled = 0
+    for _, row in twse.iterrows():
+        code = str(row.get("Code", "")).strip()
+        ticker = f"{code}.TW"
+        if ticker not in close.columns:
+            continue
+        cpx = _parse_twse_price(row.get("ClosingPrice"))
+        if cpx is None or cpx <= 0:
+            continue
+        opx = _parse_twse_price(row.get("OpeningPrice"))
+        hpx = _parse_twse_price(row.get("HighestPrice"))
+        lpx = _parse_twse_price(row.get("LowestPrice"))
+        vol = _parse_twse_price(row.get("TradeVolume"))
+        if opx is None:
+            opx = cpx
+        if hpx is None:
+            hpx = max(opx, cpx)
+        if lpx is None:
+            lpx = min(opx, cpx)
+        close.at[ts, ticker] = cpx
+        if ticker in volume.columns and vol is not None:
+            volume.at[ts, ticker] = vol
+        for key, px in (("Open", opx), ("High", hpx), ("Low", lpx), ("Close", cpx)):
+            frame = ohlcv.get(key)
+            if frame is not None and ticker in frame.columns:
+                frame.at[ts, ticker] = px
+        vol_frame = ohlcv.get("Volume")
+        if vol_frame is not None and ticker in vol_frame.columns and vol is not None:
+            vol_frame.at[ts, ticker] = vol
+        filled += 1
+
+    if taiex_close is not None and np.isfinite(taiex_close) and taiex_close > 0:
+        twii.at[ts] = float(taiex_close)
+        overlay["taiex_filled"] = True
+
+    overlay["applied"] = filled > 0
+    overlay["source"] = PRICE_SOURCE_TWSE if filled else None
+    overlay["listed_filled"] = filled
+    overlay["message"] = "appended" if appended and filled else (
+        "overlaid" if filled else "twse_today_no_overlap"
+    )
+    return ohlcv, close, volume, twii, overlay
+
+
+def resolve_same_day_prices(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
+                            twii: pd.Series, today: dt.date | None = None):
+    """Yahoo 歷史 + TWSE 當日上市收盤。Neo 帳號就緒後在此接入 fetch_neo_day_all()。"""
+    today = today or taipei_today()
+    twse = fetch_twse_day_all()
+    # neo = fetch_neo_day_all()  # future: overlay listed + TPEX when neo date == today
+    taiex_date, taiex_px = fetch_twse_taiex()
+    taiex_close = taiex_px if taiex_date == today else None
+    ohlcv, close, volume, twii, overlay = apply_twse_snapshot(
+        ohlcv, close, volume, twii, twse, today=today, taiex_close=taiex_close)
+    if overlay.get("applied"):
+        print(
+            f"[prices] TWSE overlay {overlay['message']} "
+            f"listed={overlay['listed_filled']} appended={overlay['appended_row']} "
+            f"taiex={overlay['taiex_filled']} twse_date={overlay['twse_date']}",
+            flush=True,
+        )
+    elif overlay.get("twse_date"):
+        print(f"[prices] TWSE snapshot {overlay['twse_date']} ({overlay['message']})",
+              flush=True)
+    return ohlcv, close, volume, twii, twse, overlay
 
 
 def check_freshness(close: pd.DataFrame, twii: pd.Series,
                     today: dt.date | None = None,
-                    skip: bool = False) -> dict:
-    """確認 Yahoo 資料日期為當日交易日,並用 TWSE 抽樣交叉驗證。
+                    skip: bool = False,
+                    twse: pd.DataFrame | None = None,
+                    overlay: dict | None = None,
+                    now: dt.datetime | None = None) -> dict:
+    """確認價格序列已是當日交易日。
 
-    回傳 dict: data_date, is_fresh, is_trading_day, source_checked_at, message
-    若今天有交易但 Yahoo 仍為舊資料 → is_fresh=False(呼叫端應以非零碼退出)。
+    Yahoo 已是今天時不因 TWSE 抽樣價差 >3% 擋下(還原價 vs 未還原、或已 overlay)。
+    只在 TWSE 快照日期 == 價格序列最後日期時比價,且比價僅供紀錄。
+    Yahoo 仍為昨日時:若 TWSE 已是今日,應先走 apply_twse_snapshot;套用失敗才重試。
+    平日 14:00 後且 Yahoo/TWSE 都還沒有今日檔 → is_fresh=False,等備援時段。
+    GitHub cron 若拖過午夜,台北 14:00 前仍接受上一交易日(今日盤未收)。
     """
-    today = today or dt.date.today()
+    now = now or dt.datetime.now(TAIPEI_TZ)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=TAIPEI_TZ)
+    today = today or now.date()
     data_date = pd.Timestamp(close.index[-1]).date()
-    checked_at = dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).isoformat()
+    checked_at = now.isoformat()
+    overlay = overlay or {}
     result = {
         "data_date": data_date.isoformat(),
         "is_fresh": True,
@@ -190,14 +427,15 @@ def check_freshness(close: pd.DataFrame, twii: pd.Series,
         "source_checked_at": checked_at,
         "message": "ok",
         "twse_cross_check": None,
+        "price_overlay": overlay or None,
     }
     if skip:
         result["message"] = "skipped"
         return result
 
     if data_date >= today:
-        # 交叉驗證:抽樣比對 TWSE 收盤價與 Yahoo
-        twse = fetch_twse_day_all()
+        if twse is None:
+            twse = fetch_twse_day_all()
         if twse is not None:
             twse_date = _twse_snapshot_date(twse)
             # STOCK_DAY_ALL 常晚於 Yahoo 才換成當日檔。若拿前一交易日收盤
@@ -217,58 +455,80 @@ def check_freshness(close: pd.DataFrame, twii: pd.Series,
                 return result
 
             mismatches = []
-            for sid in FRESHNESS_SAMPLE_IDS:
-                row = twse[twse["Code"] == sid]
-                if row.empty:
-                    continue
-                twse_px = _parse_twse_price(row.iloc[0].get("ClosingPrice"))
-                yf_col = f"{sid}.TW"
-                if twse_px is None or yf_col not in close.columns:
-                    continue
-                yf_px = float(close[yf_col].iloc[-1])
-                if twse_px > 0 and abs(yf_px / twse_px - 1) > 0.03:
-                    mismatches.append({"id": sid, "twse": twse_px, "yahoo": yf_px})
+            if twse_date == data_date:
+                mismatches = _sample_price_mismatches(close, twse)
             result["twse_cross_check"] = {
                 "ok": len(mismatches) == 0,
+                "skipped": False,
+                "reason": "price_mismatch_ignored" if mismatches else "matched",
                 "twse_date": twse_date.isoformat() if twse_date else None,
                 "mismatches": mismatches,
+                "warning": bool(mismatches),
             }
+            extra = ""
+            if overlay.get("applied"):
+                extra = f"（已套用 TWSE 上市收盤 {overlay.get('listed_filled', 0)} 檔）"
             if mismatches:
-                result["is_fresh"] = False
-                result["message"] = f"Yahoo 與 TWSE 收盤價偏差過大: {mismatches}"
-                return result
-        result["message"] = "fresh"
+                result["message"] = (
+                    f"fresh{extra}（Yahoo/序列已是當日;TWSE 抽樣價差僅記錄不阻擋）: "
+                    f"{mismatches}"
+                )
+            else:
+                result["message"] = f"fresh{extra}"
+            return result
+        result["message"] = "fresh" + (
+            f"（已套用 TWSE 上市收盤 {overlay.get('listed_filled', 0)} 檔）"
+            if overlay.get("applied") else ""
+        )
         return result
 
-    # Yahoo 日期落後
+    # 價格序列日期落後
     if today.weekday() >= 5:
         result["is_trading_day"] = False
         result["is_fresh"] = True
         result["message"] = f"週末,沿用 {data_date}"
         return result
 
-    twse = fetch_twse_day_all()
-    if twse is None or twse.empty:
-        # 無法確認 → 保守視為非交易日/資料尚未出,允許繼續但標記
-        result["is_trading_day"] = False
-        result["is_fresh"] = True
-        result["message"] = f"無法確認 TWSE 當日資料,沿用 {data_date}"
-        return result
+    if twse is None:
+        twse = fetch_twse_day_all()
+    twse_date = _twse_snapshot_date(twse) if twse is not None and not twse.empty else None
 
-    # TWSE 有資料代表今天有交易,但 Yahoo 還是舊的
-    sample = twse[twse["Code"].isin(FRESHNESS_SAMPLE_IDS)]
-    if sample.empty:
+    # Delayed schedule past midnight: next calendar day, but today's session
+    # has not closed. Accept last session instead of failing the late slot.
+    if now.date() == today and now.time() < dt.time(14, 0) and twse_date != today:
         result["is_trading_day"] = False
         result["is_fresh"] = True
-        result["message"] = f"TWSE 無抽樣股,沿用 {data_date}"
+        result["message"] = f"今日盤未收(台北 {now.strftime('%H:%M')}),沿用 {data_date}"
+        result["twse_cross_check"] = {
+            "ok": True,
+            "reason": "before_session_close",
+            "twse_date": twse_date.isoformat() if twse_date else None,
+        }
         return result
 
     result["is_trading_day"] = True
     result["is_fresh"] = False
+    if twse_date == today:
+        result["message"] = (
+            f"今天({today}) TWSE 已有收盤但價格序列最後日期為 {data_date},"
+            f"請稍後重試"
+        )
+        result["twse_cross_check"] = {
+            "ok": False,
+            "reason": "yahoo_stale",
+            "twse_date": twse_date.isoformat(),
+        }
+        return result
+
     result["message"] = (
-        f"今天({today})有交易但 Yahoo 最後日期為 {data_date},請稍後重試"
+        f"今天({today}) Yahoo/TWSE 皆尚未有當日收盤"
+        f"（Yahoo {data_date}, TWSE {twse_date}）,請稍後重試"
     )
-    result["twse_cross_check"] = {"ok": False, "reason": "yahoo_stale"}
+    result["twse_cross_check"] = {
+        "ok": False,
+        "reason": "sources_stale",
+        "twse_date": twse_date.isoformat() if twse_date else None,
+    }
     return result
 
 
@@ -367,7 +627,7 @@ def export(result, template, universe, data_date, outdir="output"):
     top = result[result["RS"] >= 85]
     passed = result[(result["通過樣板"] == "✔") &
                     (result["20日均量(張)"] >= MIN_AVG_VOL_ZHANG)]
-    today = dt.date.today().isoformat()
+    today = taipei_today().isoformat()
 
     passed.to_csv(f"{outdir}/趨勢樣板通過.csv", index=False, encoding="utf-8-sig")
 
@@ -444,7 +704,13 @@ def main():
         print(f"股票池:{len(uni)} 檔(上市 {sum(uni['市場']=='上市')}、上櫃 {sum(uni['市場']=='上櫃')})")
         ohlcv, close, volume = fetch_prices(uni["yf_ticker"].tolist())
         twii = fetch_index()
-        freshness = check_freshness(close, twii, skip=args.skip_freshness)
+        if args.skip_freshness:
+            freshness = check_freshness(close, twii, skip=True)
+        else:
+            ohlcv, close, volume, twii, twse, overlay = resolve_same_day_prices(
+                ohlcv, close, volume, twii)
+            freshness = check_freshness(
+                close, twii, skip=False, twse=twse, overlay=overlay)
         print(f"[freshness] {freshness['message']} | data_date={freshness['data_date']}",
               flush=True)
         if not freshness["is_fresh"]:

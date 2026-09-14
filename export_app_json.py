@@ -292,6 +292,7 @@ def export_app_json(ranking: pd.DataFrame, patterns: list[dict],
         "source_checked_at": freshness.get("source_checked_at"),
         "message": freshness.get("message"),
         "twse_cross_check": freshness.get("twse_cross_check"),
+        "price_overlay": freshness.get("price_overlay"),
         "counts": {
             "rs85": len(rs85),
             "patterns": len(pattern_rows),
