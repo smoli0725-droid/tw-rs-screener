@@ -251,8 +251,8 @@
    "outcome_pct": -9.66,
    "peak_close": 88.0,
    "trough_close": 79.5,
-   "last_date": "2026-09-11",
-   "last_close": 76.0
+   "last_date": "2026-09-14",
+   "last_close": 74.8
   },
   {
    "trade_id": "3094-2026-08-28-39",
@@ -320,8 +320,8 @@
    "outcome_pct": null,
    "peak_close": 99.8,
    "trough_close": 93.2,
-   "last_date": "2026-09-11",
-   "last_close": 93.2
+   "last_date": "2026-09-14",
+   "last_close": 93.5
   },
   {
    "trade_id": "6505-2026-09-01-75.2",
@@ -389,8 +389,8 @@
    "outcome_pct": null,
    "peak_close": 89.6,
    "trough_close": 82.5,
-   "last_date": "2026-09-11",
-   "last_close": 82.5
+   "last_date": "2026-09-14",
+   "last_close": 87.5
   },
   {
    "trade_id": "7744-2026-09-02-513",
@@ -405,15 +405,15 @@
    "breakout_date": "2026-09-02",
    "breakout_close": 540.0,
    "origin": "pattern",
-   "status": "active",
-   "outcome": null,
-   "outcome_date": null,
-   "outcome_close": null,
-   "outcome_pct": null,
+   "status": "failed",
+   "outcome": "failed",
+   "outcome_date": "2026-09-14",
+   "outcome_close": 480.5,
+   "outcome_pct": -6.34,
    "peak_close": 561.0,
-   "trough_close": 497.0,
-   "last_date": "2026-09-11",
-   "last_close": 497.0
+   "trough_close": 480.5,
+   "last_date": "2026-09-14",
+   "last_close": 480.5
   },
   {
    "trade_id": "2243-2026-09-03-42.95",
@@ -458,8 +458,8 @@
    "outcome_pct": null,
    "peak_close": 115.0,
    "trough_close": 110.5,
-   "last_date": "2026-09-11",
-   "last_close": 110.5
+   "last_date": "2026-09-14",
+   "last_close": 112.5
   },
   {
    "trade_id": "2885-2026-09-03-68.08",
@@ -479,10 +479,10 @@
    "outcome_date": null,
    "outcome_close": null,
    "outcome_pct": null,
-   "peak_close": 70.6,
+   "peak_close": 70.8,
    "trough_close": 68.5,
-   "last_date": "2026-09-11",
-   "last_close": 70.0
+   "last_date": "2026-09-14",
+   "last_close": 70.8
   },
   {
    "trade_id": "3231-2026-09-03-188",
@@ -503,9 +503,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 198.0,
-   "trough_close": 185.0,
-   "last_date": "2026-09-11",
-   "last_close": 185.5
+   "trough_close": 181.0,
+   "last_date": "2026-09-14",
+   "last_close": 181.0
   },
   {
    "trade_id": "2388-2026-09-04-78",
@@ -520,15 +520,15 @@
    "breakout_date": "2026-09-04",
    "breakout_close": 81.4,
    "origin": "pattern",
-   "status": "active",
-   "outcome": null,
-   "outcome_date": null,
-   "outcome_close": null,
-   "outcome_pct": null,
+   "status": "failed",
+   "outcome": "failed",
+   "outcome_date": "2026-09-14",
+   "outcome_close": 72.3,
+   "outcome_pct": -7.31,
    "peak_close": 81.4,
-   "trough_close": 75.2,
-   "last_date": "2026-09-11",
-   "last_close": 75.2
+   "trough_close": 72.3,
+   "last_date": "2026-09-14",
+   "last_close": 72.3
   },
   {
    "trade_id": "3406-2026-09-04-1055",
@@ -595,9 +595,32 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 67.2,
-   "trough_close": 61.7,
-   "last_date": "2026-09-11",
-   "last_close": 61.7
+   "trough_close": 61.5,
+   "last_date": "2026-09-14",
+   "last_close": 61.5
+  },
+  {
+   "trade_id": "6021-2026-09-04-39.95",
+   "id": "6021",
+   "name": "美好證",
+   "market": "上櫃",
+   "pattern": "作弊型態",
+   "pattern_label": "作弊型態",
+   "yf_ticker": "6021.TWO",
+   "rs": 91,
+   "pivot": 39.95,
+   "breakout_date": "2026-09-04",
+   "breakout_close": 40.25,
+   "origin": "pattern",
+   "status": "success",
+   "outcome": "success",
+   "outcome_date": "2026-09-14",
+   "outcome_close": 44.75,
+   "outcome_pct": 12.02,
+   "peak_close": 44.75,
+   "trough_close": 40.25,
+   "last_date": "2026-09-14",
+   "last_close": 44.75
   },
   {
    "trade_id": "6224-2026-09-04-81.2",
@@ -619,8 +642,8 @@
    "outcome_pct": null,
    "peak_close": 89.0,
    "trough_close": 84.5,
-   "last_date": "2026-09-11",
-   "last_close": 87.5
+   "last_date": "2026-09-14",
+   "last_close": 85.0
   },
   {
    "trade_id": "6924-2026-09-04-119.5",
@@ -709,10 +732,10 @@
    "outcome_date": null,
    "outcome_close": null,
    "outcome_pct": null,
-   "peak_close": 52.2,
+   "peak_close": 52.9,
    "trough_close": 51.7,
-   "last_date": "2026-09-11",
-   "last_close": 51.9
+   "last_date": "2026-09-14",
+   "last_close": 52.9
   },
   {
    "trade_id": "6021-2026-09-07-40.35",
@@ -727,15 +750,15 @@
    "breakout_date": "2026-09-07",
    "breakout_close": 40.85,
    "origin": "pattern",
-   "status": "active",
-   "outcome": null,
-   "outcome_date": null,
-   "outcome_close": null,
-   "outcome_pct": null,
-   "peak_close": 43.05,
+   "status": "success",
+   "outcome": "success",
+   "outcome_date": "2026-09-14",
+   "outcome_close": 44.75,
+   "outcome_pct": 10.9,
+   "peak_close": 44.75,
    "trough_close": 40.85,
-   "last_date": "2026-09-11",
-   "last_close": 43.05
+   "last_date": "2026-09-14",
+   "last_close": 44.75
   },
   {
    "trade_id": "6292-2026-09-07-63.9",
@@ -757,8 +780,8 @@
    "outcome_pct": null,
    "peak_close": 66.3,
    "trough_close": 65.2,
-   "last_date": "2026-09-11",
-   "last_close": 65.2
+   "last_date": "2026-09-14",
+   "last_close": 66.0
   },
   {
    "trade_id": "6416-2026-09-08-102",
@@ -802,9 +825,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 26.85,
-   "trough_close": 24.45,
-   "last_date": "2026-09-11",
-   "last_close": 24.45
+   "trough_close": 24.35,
+   "last_date": "2026-09-14",
+   "last_close": 24.35
   },
   {
    "trade_id": "3406-2026-09-09-1055",
@@ -819,15 +842,15 @@
    "breakout_date": "2026-09-09",
    "breakout_close": 1110.0,
    "origin": "recovered",
-   "status": "active",
-   "outcome": null,
-   "outcome_date": null,
-   "outcome_close": null,
-   "outcome_pct": null,
+   "status": "failed",
+   "outcome": "failed",
+   "outcome_date": "2026-09-14",
+   "outcome_close": 954.0,
+   "outcome_pct": -9.57,
    "peak_close": 1110.0,
-   "trough_close": 1060.0,
-   "last_date": "2026-09-11",
-   "last_close": 1060.0
+   "trough_close": 954.0,
+   "last_date": "2026-09-14",
+   "last_close": 954.0
   },
   {
    "trade_id": "3441-2026-09-09-139.5",
@@ -872,8 +895,8 @@
    "outcome_pct": -7.44,
    "peak_close": 566.0,
    "trough_close": 510.0,
-   "last_date": "2026-09-11",
-   "last_close": 510.0
+   "last_date": "2026-09-14",
+   "last_close": 507.0
   },
   {
    "trade_id": "3711-2026-09-09-628",
@@ -894,9 +917,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 650.0,
-   "trough_close": 618.0,
-   "last_date": "2026-09-11",
-   "last_close": 618.0
+   "trough_close": 612.0,
+   "last_date": "2026-09-14",
+   "last_close": 612.0
   },
   {
    "trade_id": "4908-2026-09-09-241.5",
@@ -911,15 +934,15 @@
    "breakout_date": "2026-09-09",
    "breakout_close": 242.0,
    "origin": "pattern",
-   "status": "active",
-   "outcome": null,
-   "outcome_date": null,
-   "outcome_close": null,
-   "outcome_pct": null,
+   "status": "failed",
+   "outcome": "failed",
+   "outcome_date": "2026-09-14",
+   "outcome_close": 225.5,
+   "outcome_pct": -6.63,
    "peak_close": 249.0,
-   "trough_close": 237.5,
-   "last_date": "2026-09-11",
-   "last_close": 237.5
+   "trough_close": 225.5,
+   "last_date": "2026-09-14",
+   "last_close": 225.5
   },
   {
    "trade_id": "5292-2026-09-09-222",
@@ -940,9 +963,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 223.5,
-   "trough_close": 217.0,
-   "last_date": "2026-09-11",
-   "last_close": 217.0
+   "trough_close": 215.5,
+   "last_date": "2026-09-14",
+   "last_close": 215.5
   },
   {
    "trade_id": "5468-2026-09-09-25.6",
@@ -963,9 +986,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 27.9,
-   "trough_close": 26.3,
-   "last_date": "2026-09-11",
-   "last_close": 26.3
+   "trough_close": 25.0,
+   "last_date": "2026-09-14",
+   "last_close": 25.0
   },
   {
    "trade_id": "6196-2026-09-09-528",
@@ -987,8 +1010,8 @@
    "outcome_pct": null,
    "peak_close": 535.0,
    "trough_close": 511.0,
-   "last_date": "2026-09-11",
-   "last_close": 511.0
+   "last_date": "2026-09-14",
+   "last_close": 520.0
   },
   {
    "trade_id": "6531-2026-09-09-995",
@@ -1009,9 +1032,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 1030.0,
-   "trough_close": 988.0,
-   "last_date": "2026-09-11",
-   "last_close": 988.0
+   "trough_close": 962.0,
+   "last_date": "2026-09-14",
+   "last_close": 962.0
   },
   {
    "trade_id": "6933-2026-09-09-331",
@@ -1026,15 +1049,15 @@
    "breakout_date": "2026-09-09",
    "breakout_close": 338.0,
    "origin": "pattern",
-   "status": "active",
-   "outcome": null,
-   "outcome_date": null,
-   "outcome_close": null,
-   "outcome_pct": null,
+   "status": "failed",
+   "outcome": "failed",
+   "outcome_date": "2026-09-14",
+   "outcome_close": 305.5,
+   "outcome_pct": -7.7,
    "peak_close": 338.0,
-   "trough_close": 320.0,
-   "last_date": "2026-09-11",
-   "last_close": 320.0
+   "trough_close": 305.5,
+   "last_date": "2026-09-14",
+   "last_close": 305.5
   },
   {
    "trade_id": "2221-2026-09-10-91.5",
@@ -1055,9 +1078,9 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 96.5,
-   "trough_close": 95.4,
-   "last_date": "2026-09-11",
-   "last_close": 95.4
+   "trough_close": 89.9,
+   "last_date": "2026-09-14",
+   "last_close": 89.9
   },
   {
    "trade_id": "1560-2026-09-11-736",
@@ -1078,9 +1101,78 @@
    "outcome_close": null,
    "outcome_pct": null,
    "peak_close": 790.0,
-   "trough_close": 790.0,
-   "last_date": "2026-09-11",
-   "last_close": 790.0
+   "trough_close": 753.0,
+   "last_date": "2026-09-14",
+   "last_close": 753.0
+  },
+  {
+   "trade_id": "3034-2026-09-14-552",
+   "id": "3034",
+   "name": "聯詠",
+   "market": "上市",
+   "pattern": "作弊型態",
+   "pattern_label": "作弊型態",
+   "yf_ticker": "3034.TW",
+   "rs": 85,
+   "pivot": 552.0,
+   "breakout_date": "2026-09-14",
+   "breakout_close": 556.0,
+   "origin": "pattern",
+   "status": "active",
+   "outcome": null,
+   "outcome_date": null,
+   "outcome_close": null,
+   "outcome_pct": null,
+   "peak_close": 556.0,
+   "trough_close": 556.0,
+   "last_date": "2026-09-14",
+   "last_close": 556.0
+  },
+  {
+   "trade_id": "3044-2026-09-14-510",
+   "id": "3044",
+   "name": "健鼎",
+   "market": "上市",
+   "pattern": "作弊型態",
+   "pattern_label": "作弊型態",
+   "yf_ticker": "3044.TW",
+   "rs": 86,
+   "pivot": 510.0,
+   "breakout_date": "2026-09-14",
+   "breakout_close": 510.0,
+   "origin": "pattern",
+   "status": "active",
+   "outcome": null,
+   "outcome_date": null,
+   "outcome_close": null,
+   "outcome_pct": null,
+   "peak_close": 510.0,
+   "trough_close": 510.0,
+   "last_date": "2026-09-14",
+   "last_close": 510.0
+  },
+  {
+   "trade_id": "6894-2026-09-14-358",
+   "id": "6894",
+   "name": "衛司特",
+   "market": "上櫃",
+   "pattern": "作弊型態",
+   "pattern_label": "作弊型態",
+   "yf_ticker": "6894.TWO",
+   "rs": 85,
+   "pivot": 358.0,
+   "breakout_date": "2026-09-14",
+   "breakout_close": 364.0,
+   "origin": "pattern",
+   "status": "active",
+   "outcome": null,
+   "outcome_date": null,
+   "outcome_close": null,
+   "outcome_pct": null,
+   "peak_close": 364.0,
+   "trough_close": 364.0,
+   "last_date": "2026-09-14",
+   "last_close": 364.0
   }
  ],
  "history": [
@@ -1131,18 +1223,26 @@
    "pending": 23,
    "win_rate": 0.765,
    "label": "市況良好"
+  },
+  {
+   "date": "2026-09-14",
+   "wins": 14,
+   "losses": 9,
+   "pending": 20,
+   "win_rate": 0.609,
+   "label": "市況良好"
   }
  ],
- "updated": "2026-09-11",
+ "updated": "2026-09-14",
  "market": {
-  "as_of": "2026-09-11",
+  "as_of": "2026-09-14",
   "window_days": 10,
-  "window_start": "2026-08-31",
-  "wins": 13,
-  "losses": 4,
-  "pending": 23,
+  "window_start": "2026-09-01",
+  "wins": 14,
+  "losses": 9,
+  "pending": 20,
   "recovered": 0,
-  "win_rate": 0.765,
+  "win_rate": 0.609,
   "label": "市況良好",
   "rules": {
    "buy_zone_pct": 5.0,
