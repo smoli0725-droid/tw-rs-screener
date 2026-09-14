@@ -1,9 +1,9 @@
 {
   "data_date": "2026-09-14",
-  "generated_at": "2026-09-15T00:29:14.162612+08:00",
+  "generated_at": "2026-09-15T01:33:36.223247+08:00",
   "is_fresh": true,
   "is_trading_day": true,
-  "source_checked_at": "2026-09-15T00:29:03.968016+08:00",
+  "source_checked_at": "2026-09-15T01:33:28.014259+08:00",
   "message": "fresh（TWSE 快照 2026-09-11 尚未更新,略過交叉比價）",
   "twse_cross_check": {
     "ok": true,
