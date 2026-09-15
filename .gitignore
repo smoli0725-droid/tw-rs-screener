@@ -7,3 +7,4 @@ node_modules/
 .wrangler/
 .dev.vars
 functions/.wrangler/
+.cursor/skills/verify-tradingvenator/artifacts/
