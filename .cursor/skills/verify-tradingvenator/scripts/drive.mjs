@@ -217,7 +217,7 @@ async function ariaSnapshot(page) {
 async function saveEvidence(outDir, name, page, extra) {
   ensureDir(outDir);
   const png = path.join(outDir, `${name}.png`);
-  await page.screenshot({ path: png, fullPage: true });
+  await page.screenshot({ path: png, fullPage: false });
   const snap = await snapshotDom(page);
   const aria = await ariaSnapshot(page);
   fs.writeFileSync(path.join(outDir, `${name}.aria.yml`), aria);

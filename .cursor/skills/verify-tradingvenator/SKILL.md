@@ -122,7 +122,7 @@ Exercise the real user path (nav / tabs / chips), not internal setters. Capture 
 
 Each `drive.mjs --feature <id>` writes to `.cursor/skills/verify-tradingvenator/artifacts/<id>/`:
 
-- `01-*.png` / `02-*.png` — screenshots (brand title TradingVenator visible)
+- `01-*.png` / `02-*.png` — viewport screenshots at 390×844 (brand title TradingVenator visible; not a full-page dump of hundreds of RS rows)
 - `*.aria.yml` — Playwright ARIA snapshot
 - `*.snapshot.json` — ids, active nav/tab, list sample rows
 - `result.json` — ok flag, url, error if any
