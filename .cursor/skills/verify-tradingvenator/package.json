@@ -1,0 +1,9 @@
+{
+  "name": "verify-tradingvenator",
+  "private": true,
+  "type": "module",
+  "description": "Skill-local Playwright harness for the TradingVenator static web UI",
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}
