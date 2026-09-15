@@ -12,6 +12,11 @@ on:
       - "scripts/inject_pages_config.py"
       - ".github/workflows/deploy-site.yml"
   workflow_dispatch:
+  # Daily RS commits with the default GITHUB_TOKEN, which does not trigger
+  # other workflows' `push` events. Chain this deploy after that run completes.
+  workflow_run:
+    workflows: ["Daily Taiwan RS Update"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -22,12 +27,19 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     env:
       CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
       D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # workflow_run.head_sha is Daily RS's starting commit, not the
+          # output/ commit it pushed (GITHUB_TOKEN push does not chain).
+          # Check out that run's branch tip so we deploy the new files.
+          # For push / workflow_dispatch, github.sha is the triggering commit.
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.sha }}
 
       - name: Check Cloudflare secrets
         run: |
