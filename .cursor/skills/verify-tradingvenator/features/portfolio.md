@@ -23,7 +23,7 @@ Preconditions:
 - Do not set `TV_VERIFY_URL` to production while using a personal Clerk session.
 
 - **Open holdings.** Choose 持股. Run `node .cursor/skills/verify-tradingvenator/scripts/drive.mjs --feature portfolio --bypass-auth`. `#view-portfolio` is `.active`. `#totalMv` is visible.
-- **Read list.** `#positionList` is either the empty copy `尚未有持股，點上方新增` (local bypass) or symbol rows. Screenshot must show TradingVenator and the 持股 nav active.
+- **Read list.** `#positionList` is either the empty copy `尚未有持股，點上方新增` (local bypass) or symbol rows. Screenshot must show FlashPick and the 持股 nav active.
 - **Skip mutations.** Do not click `#addTradeBtn` / `[data-sell]` / `[data-delete-pos]` / submit `#tradeForm` unless a later recipe isolates a throwaway context. Live D1 would persist those writes.
 - **Proof.** `artifacts/portfolio/01-holdings.png` and `01-holdings.snapshot.json` (`activeNav: portfolio`). `result.json` `ok: true`.
 

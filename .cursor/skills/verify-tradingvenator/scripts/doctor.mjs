@@ -80,8 +80,8 @@ try {
   if (index.status !== 200) {
     fail(report, `GET ${report.url} -> ${index.status}`);
   }
-  if (!index.text.includes('TradingVenator')) {
-    fail(report, `GET ${report.url} 200 but body is not TradingVenator`);
+  if (!index.text.includes('FlashPick')) {
+    fail(report, `GET ${report.url} 200 but body is not FlashPick`);
   }
 
   const metaUrl = new URL('data/meta.json', report.url).href;
