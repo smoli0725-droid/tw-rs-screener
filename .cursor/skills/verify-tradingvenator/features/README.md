@@ -24,7 +24,7 @@ Flutter under `app/` is out of scope. Pages Functions / D1 / Clerk cloud sync ar
 ## Proof and skip reporting
 
 - Capture the user action and the resulting state (before/after screenshots when the recipe clicks nav or chips).
-- UI proof includes an ARIA snapshot and a screenshot with the TradingVenator brand visible.
+- UI proof includes an ARIA snapshot and a screenshot with the FlashPick brand visible.
 - Record the feature id and entry point in `artifacts/<feature>/result.json`.
 - Report an unreachable path with the attempted command and the unmet precondition (usually Clerk session on live).
 - Do not report a skipped entry point as verified through a different path. `--bypass-auth` is not a Clerk sign-in.
