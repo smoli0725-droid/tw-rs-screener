@@ -146,7 +146,7 @@ Future<void> _runRefresh({required bool notify, required bool allowRetry}) async
 
   if (notify && (prefs.getBool('notify_enabled') ?? true)) {
     await _notify(
-      title: '台股 RS 持股更新',
+      title: '閃電選股 持股更新',
       body: '資料 ${dataDate ?? '—'} · 損益 ${fmtMoney(totalPnl)}'
           '${stale || !fresh ? ' · 資料尚未更新' : ''}',
     );

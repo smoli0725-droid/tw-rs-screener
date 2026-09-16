@@ -28,7 +28,7 @@ That script:
 - Writes pid/port/url to `.cursor/skills/verify-tradingvenator/artifacts/.run/`.
 - Reuses that pid if it is still alive on the same port. If the port is taken by **another** process, it exits 1 and tells you to set `TV_VERIFY_PORT` (it does not kill strangers).
 
-Ready when stdout contains `ready pid=` and `curl -sf http://127.0.0.1:4173/` returns 200 with `FlashPick`.
+Ready when stdout contains `ready pid=` and `curl -sf http://127.0.0.1:4173/` returns 200 with `閃電選股` and `FlashPick`.
 
 Equivalent manual launch if you must not use the helper:
 
@@ -66,8 +66,8 @@ node .cursor/skills/verify-tradingvenator/scripts/doctor.mjs --ui
 
 Pass only if:
 
-- Local: recorded pid is alive, `GET /` is 200 FlashPick, `GET /data/meta.json` is 200 JSON.
-- Live (`TV_VERIFY_URL`): `GET /` is 200 FlashPick. `/data/meta.json` may 404 behind Pages routing; that is not a local-bundle failure.
+- Local: recorded pid is alive, `GET /` is 200 with 閃電選股 and FlashPick, `GET /data/meta.json` is 200 JSON.
+- Live (`TV_VERIFY_URL`): `GET /` is 200 with 閃電選股 and FlashPick. `/data/meta.json` may 404 behind Pages routing; that is not a local-bundle failure.
 
 Stdout is JSON. Read these fields:
 
@@ -122,7 +122,7 @@ Exercise the real user path (nav / tabs / chips), not internal setters. Capture 
 
 Each `drive.mjs --feature <id>` writes to `.cursor/skills/verify-tradingvenator/artifacts/<id>/`:
 
-- `01-*.png` / `02-*.png` — viewport screenshots at 390×844 (brand title FlashPick visible; not a full-page dump of hundreds of RS rows)
+- `01-*.png` / `02-*.png` — viewport screenshots at 390×844 (brand 閃電選股 · FlashPick visible; not a full-page dump of hundreds of RS rows)
 - `*.aria.yml` — Playwright ARIA snapshot
 - `*.snapshot.json` — ids, active nav/tab, list sample rows
 - `result.json` — ok flag, url, error if any

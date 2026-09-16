@@ -27,7 +27,7 @@ Preconditions:
 - **Read 市況.** Inspect `#marketCard`. The card title contains `市況` (for current data, `市況良好` / `市況中性` / `市況不佳` plus a percent). If JSON has no market block, the card still says `市況指標` and `尚無突破追蹤資料`.
 - **Read RS≥85.** Default tab `data-sub="rs85"` is `.active`. `#rs85List` contains `article.item` rows (`{id} {name}` and `RS {n}`) or `沒有符合的股票`. `#metaLine` contains `資料` and a date.
 - **Market chip.** Choose **上市**. Run in the same browser: click `.chip[data-market="上市"]`. Listed rows show `上市` in `.item-sub`. Choose **全部** to restore.
-- **Proof.** `artifacts/recommend/01-before-nav.png` is the starting view (持股 or already-recommend). `artifacts/recommend/02-recommend.png` and `02-recommend.aria.yml` show FlashPick, `#marketCard` 市況, and `#rs85List`. `result.json` has `ok: true`.
+- **Proof.** `artifacts/recommend/01-before-nav.png` is the starting view (持股 or already-recommend). `artifacts/recommend/02-recommend.png` and `02-recommend.aria.yml` show 閃電選股 · FlashPick, `#marketCard` 市況, and `#rs85List`. `result.json` has `ok: true`.
 
 ## Gotchas
 

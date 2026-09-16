@@ -24,7 +24,7 @@ class TaiwanRsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '台股 RS 選股',
+      title: '閃電選股',
       theme: AppTheme.light(),
       home: const HomeShell(),
       debugShowCheckedModeBanner: false,

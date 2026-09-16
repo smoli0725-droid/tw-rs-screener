@@ -80,8 +80,11 @@ try {
   if (index.status !== 200) {
     fail(report, `GET ${report.url} -> ${index.status}`);
   }
-  if (!index.text.includes('FlashPick')) {
-    fail(report, `GET ${report.url} 200 but body is not FlashPick`);
+  if (!index.text.includes('FlashPick') || !index.text.includes('閃電選股')) {
+    fail(report, `GET ${report.url} 200 but body is missing FlashPick / 閃電選股`);
+  }
+  if (index.text.includes('>TV<')) {
+    fail(report, `GET ${report.url} still contains the TV text logo`);
   }
 
   const metaUrl = new URL('data/meta.json', report.url).href;

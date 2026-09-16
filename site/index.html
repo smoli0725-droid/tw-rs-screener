@@ -5,31 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#0b3d4a" />
-  <title>FlashPick</title>
+  <title>閃電選股 · FlashPick</title>
+  <meta name="description" content="閃電選股 · FlashPick — 台股 RS 選股與持股管理" />
   <meta name="clerk-publishable-key" content="__CLERK_PUBLISHABLE_KEY__" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" href="favicon.ico?v=20260915" sizes="any" />
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=20260915" />
-  <link rel="apple-touch-icon" href="icons/icon-180.png?v=20260915" />
-  <meta property="og:title" content="FlashPick" />
+  <link rel="icon" href="favicon.ico?v=20260916" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=20260916" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png?v=20260916" />
+  <meta property="og:title" content="閃電選股 · FlashPick" />
+  <meta property="og:site_name" content="閃電選股" />
+  <meta property="og:description" content="台股 RS 選股與持股管理" />
   <meta property="og:image" content="https://tradingvenator.pages.dev/icons/og-1200x630.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="FlashPick" />
+  <meta name="twitter:title" content="閃電選股 · FlashPick" />
   <meta name="twitter:image" content="https://tradingvenator.pages.dev/icons/og-1200x630.png" />
 </head>
 <body class="signed-out">
   <div id="auth-gate" class="auth-gate">
     <div class="auth-card">
       <div class="brand auth-brand">
-        <div class="brand-mark" title="FlashPick">TV</div>
+        <img class="brand-mark" src="icons/icon-192.png?v=20260916" width="56" height="56" alt="閃電選股" />
         <div>
-          <div class="brand-title">FlashPick</div>
+          <div class="brand-title-row">
+            <div class="brand-title">閃電選股</div>
+            <div class="brand-en">FlashPick</div>
+          </div>
           <div class="meta-line">登入後才能查看持股、RS 與型態</div>
         </div>
       </div>
@@ -46,9 +52,12 @@
   <div class="app-shell">
   <header class="topbar">
     <div class="brand">
-      <div class="brand-mark" title="FlashPick">TV</div>
+      <img class="brand-mark" src="icons/icon-192.png?v=20260916" width="42" height="42" alt="閃電選股" />
       <div>
-        <div class="brand-title">FlashPick</div>
+        <div class="brand-title-row">
+          <div class="brand-title">閃電選股</div>
+          <div class="brand-en">FlashPick</div>
+        </div>
         <div id="metaLine" class="meta-line">載入資料中…</div>
       </div>
     </div>
@@ -125,6 +134,11 @@
     </section>
 
     <section id="view-settings" class="view">
+      <div class="card" id="aboutCard">
+        <h3>關於</h3>
+        <p class="about-name">閃電選股 · FlashPick</p>
+        <p class="hint">台股 RS 選股與持股管理。</p>
+      </div>
       <div class="card" id="accountCard">
         <h3>帳號</h3>
         <div id="accountBody" class="hint">載入中…</div>

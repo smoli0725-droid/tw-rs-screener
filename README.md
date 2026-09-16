@@ -149,7 +149,7 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
 
 English / 中文步驟相同：
 
-1. Open [dashboard.clerk.com](https://dashboard.clerk.com) → **Create application**（名稱例如 `TradingVenator`）
+1. Open [dashboard.clerk.com](https://dashboard.clerk.com) → **Create application**（名稱例如 `FlashPick`）
 2. **Sign-in options**
    - Enable **Email**（magic link / email code；可關 password）
    - Enable **Google**
