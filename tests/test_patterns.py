@@ -694,6 +694,86 @@ def test_tracker_ignores_non_primary_and_no_duplicate():
     assert len(ledger["trades"]) == 1
 
 
+def test_tracker_blocks_historical_overlap_same_cycle_and_next_run():
+    """同一次 update 先把舊單判定結束後,不得用舊進行區間內的歷史穿越再開單;
+    下一次跑同一歷史候選仍不可開。"""
+    ledger = empty_ledger()
+    prices_open = [95.0] * 15 + [101.0]
+    df_open = _close_df(prices_open)
+    update_ledger(ledger, [_hit(pivot=100.0)], df_open,
+                  df_open.index[-1].date().isoformat())
+    assert len(ledger["trades"]) == 1
+    assert ledger["trades"][0]["status"] == TRADE_ACTIVE
+
+    # 舊單突破後再穿越較高樞紐,最後才達到舊樞紐 +10%。
+    # 同一次 update 會先把 A 標成成功,若只看此刻 status=active 就會誤開 B。
+    prices = prices_open + [102.0, 103.5, 104.0, 111.0]
+    df = _close_df(prices)
+    d = df.index[-1].date().isoformat()
+    update_ledger(ledger, [_hit(pivot=103.0)], df, d)
+    assert len(ledger["trades"]) == 1
+    t = ledger["trades"][0]
+    assert t["status"] == TRADE_SUCCESS
+    assert t["pivot"] == 100.0
+    assert t["outcome_date"] == d
+
+    update_ledger(ledger, [_hit(pivot=103.0)], df, d)
+    assert len(ledger["trades"]) == 1
+
+
+def test_tracker_allows_new_trade_after_prior_outcome():
+    """先前交易判定結束後,突破日落在判定日之後的新穿越仍可開。"""
+    ledger = empty_ledger()
+    prices_open = [95.0] * 15 + [101.0]
+    df_open = _close_df(prices_open)
+    update_ledger(ledger, [_hit(pivot=100.0)], df_open,
+                  df_open.index[-1].date().isoformat())
+
+    prices = prices_open + [102.0, 103.0, 111.0]
+    df_success = _close_df(prices)
+    update_ledger(ledger, [], df_success, df_success.index[-1].date().isoformat())
+    assert ledger["trades"][0]["status"] == TRADE_SUCCESS
+    outcome = ledger["trades"][0]["outcome_date"]
+
+    prices2 = prices + [105.0, 107.0]
+    df2 = _close_df(prices2)
+    d2 = df2.index[-1].date().isoformat()
+    update_ledger(ledger, [_hit(pivot=106.0)], df2, d2)
+    assert len(ledger["trades"]) == 2
+    new = [t for t in ledger["trades"] if t["pivot"] == 106.0][0]
+    assert new["breakout_date"] == d2
+    assert new["breakout_date"] > outcome
+    assert new["origin"] == "pattern"
+
+
+def test_tracker_overlap_includes_outcome_date():
+    """候選突破日 = 舊單判定日仍視為重疊;隔日新穿越才可開。"""
+    ledger = empty_ledger()
+    prices_open = [95.0] * 15 + [101.0]
+    df_open = _close_df(prices_open)
+    update_ledger(ledger, [_hit(pivot=100.0)], df_open,
+                  df_open.index[-1].date().isoformat())
+
+    prices = prices_open + [102.0, 111.0]
+    df = _close_df(prices)
+    d = df.index[-1].date().isoformat()
+    update_ledger(ledger, [], df, d)
+    assert ledger["trades"][0]["outcome_date"] == d
+
+    # 110 的穿越日就是判定日 → 禁止
+    update_ledger(ledger, [_hit(pivot=110.0)], df, d)
+    assert len(ledger["trades"]) == 1
+
+    prices2 = prices + [108.0, 112.0]
+    df2 = _close_df(prices2)
+    d2 = df2.index[-1].date().isoformat()
+    update_ledger(ledger, [_hit(pivot=109.0)], df2, d2)
+    assert len(ledger["trades"]) == 2
+    new = [t for t in ledger["trades"] if t["pivot"] == 109.0][0]
+    assert new["breakout_date"] == d2
+    assert new["breakout_date"] > d
+
+
 def test_market_stats_window_by_outcome_date():
     ledger = empty_ledger()
     df = _close_df([100.0] * 30)

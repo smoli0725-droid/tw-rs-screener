@@ -8,6 +8,8 @@
 * 失敗:突破後收盤 ≤ pivot × (1 - fail_pct)
 * 復甦:失敗後收盤回到 pivot 下方 0~near_pivot_pct → 重新列入「即將突破」;
   若再收過 pivot 則開一筆新交易。
+* 同代號仍有進行中時禁止再開:候選突破日若落在既有交易的進行區間
+  [breakout_date, outcome_date](含兩端;尚無 outcome_date 視為仍進行中),不得再開新單。
 
 市況 = 近 `window_days` 個交易日內,以「判定日」計的成功 ÷ (成功 + 失敗)。
 勝率 < 50% 視為市況不佳。仍在追蹤中的不計入分母,另列「進行中」。
@@ -145,6 +147,24 @@ def _bars_since(s: pd.Series, date_str: str) -> int:
     return len(_bars_after(s, date_str))
 
 
+def _trade_active_on(trade: dict, date_str: str) -> bool:
+    """交易進行區間為 [breakout_date, outcome_date](含兩端)。
+
+    尚無 outcome_date 視為目前仍進行中,覆蓋突破日當日與之後任一日期。
+    """
+    bdate = trade.get("breakout_date")
+    if not bdate or date_str < bdate:
+        return False
+    odate = trade.get("outcome_date")
+    if not odate:
+        return True
+    return date_str <= odate
+
+
+def _symbol_occupied_on(trades: list[dict], sid: str, date_str: str) -> bool:
+    return any(x.get("id") == sid and _trade_active_on(x, date_str) for x in trades)
+
+
 # ---------------------------------------------------------------- core
 def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
                   data_date: str, p: PatternParams = PARAMS,
@@ -182,8 +202,10 @@ def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
         t["last_close"] = last
         if last >= pivot:
             # 再突破 → 開新交易,舊交易標記 reentered
-            already = any(x["id"] == t["id"] and x["status"] == TRADE_ACTIVE for x in trades + new_trades)
-            if not already:
+            occupied = _symbol_occupied_on(trades + new_trades, t["id"], data_date)
+            already = any(x["id"] == t["id"] and x["status"] == TRADE_ACTIVE
+                          for x in trades + new_trades)
+            if not occupied and not already:
                 nt = _open_trade(t, s, pivot, data_date, p, origin="recovered")
                 if nt:
                     new_trades.append(nt)
@@ -211,7 +233,12 @@ def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
         if bi is None:
             continue
         bdate = _date_str(s.index[bi])
+        # 目前仍進行中,或候選突破日落在既有交易進行區間內,都不可再開。
+        # 不可只看此刻 status=active:同一次 update 可能已先把舊單判定結束,
+        # 下一次跑仍可能掃到舊進行區間內的歷史穿越。
         if any(x["id"] == sid and x["status"] == TRADE_ACTIVE for x in trades):
+            continue
+        if _symbol_occupied_on(trades, sid, bdate):
             continue
         if any(x["id"] == sid and x.get("breakout_date") == bdate for x in trades):
             continue
