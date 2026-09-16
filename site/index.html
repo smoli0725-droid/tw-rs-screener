@@ -124,12 +124,11 @@
             <button class="chip active" data-trade="success" type="button">成功</button>
             <button class="chip active" data-trade="failed" type="button">失敗</button>
             <button class="chip active" data-trade="recovered" type="button">復甦</button>
-            <button class="chip active" data-trade="reentered" type="button">再突破</button>
           </div>
         </div>
         <div id="tradeCount" class="count-line"></div>
         <div id="tradeList" class="list"></div>
-        <p class="hint">規則：收盤站上樞紐即記一筆交易；之後收盤 ≥ 樞紐 +10% 為成功、≤ 樞紐 −5% 為失敗。失敗後若收盤回到樞紐下方 0~5% 為復甦，重新列入即將突破。成功／失敗只列近 10 個交易日內判定的（與市況同一視窗）；進行中、復甦不限。市況 = 該視窗內成功 ÷（成功＋失敗）。</p>
+        <p class="hint">規則：收盤站上樞紐即記一筆交易；之後收盤 ≥ 樞紐 +10% 為成功、≤ 樞紐 −5% 為失敗。失敗後若收盤回到樞紐下方 0~5% 為復甦，重新列入即將突破。復甦後再站上樞紐會開一筆新交易，並標「復甦後再突破」（舊的再突破列不另列出）。成功／失敗只列近 10 個交易日內判定的（與市況同一視窗）；進行中、復甦不限。市況 = 該視窗內成功 ÷（成功＋失敗）。</p>
       </div>
     </section>
 

@@ -96,7 +96,7 @@ Stable handles:
 | Recommend tabs | `#view-recommend button.tab[data-sub="rs85\|patterns\|breakouts"]` (RS≥85 / 型態／突破 / 交易追蹤). 市況 is **not** a tab; it is `#marketCard` on the recommend view. |
 | RS list | `#rs85List`, search `#rsSearch`, chips `[data-market]`, `#tplOnlyChip` |
 | Patterns | `#statusChips` (`data-status`), `#patternChips` (`data-pattern`), `#patternList`, `#patternCount` |
-| Trade tracking | `#tradeChips` (`data-trade`: `active\|success\|failed\|recovered\|reentered`), `#tradeList`, `#tradeCount` |
+| Trade tracking | `#tradeChips` (`data-trade`: `active\|success\|failed\|recovered`), `#tradeList`, `#tradeCount` |
 | Portfolio | `#positionList`, `#totalMv`, `#totalPnl`, `#addTradeBtn`, `#metricsBtn` |
 | Settings | `#dataBaseUrl`, `#saveSettingsBtn`, `#resetSettingsBtn`, `#dataStatusBody`, `#accountCard` |
 | Refresh | `#refreshBtn` |
