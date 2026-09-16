@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <application
-        android:label="台股RS選股"
+        android:label="閃電選股"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

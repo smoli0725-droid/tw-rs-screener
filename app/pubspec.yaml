@@ -1,5 +1,5 @@
 name: taiwan_rs_app
-description: 台股 RS 選股與持股管理 App（Minervini 型態篩選）
+description: 閃電選股 · FlashPick — 台股 RS 選股與持股管理 App（Minervini 型態篩選）
 publish_to: "none"
 version: 1.0.0+1
 
@@ -30,3 +30,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/cheetah.png

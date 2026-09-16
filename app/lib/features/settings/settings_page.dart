@@ -70,6 +70,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/brand/cheetah.png',
+                  width: 48,
+                  height: 48,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '閃電選股',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                  ),
+                  Text('FlashPick'),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 32),
           Text('資料來源', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           TextField(
