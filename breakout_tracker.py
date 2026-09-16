@@ -345,9 +345,11 @@ def recent_trades(ledger: dict, close_df: pd.DataFrame | None = None,
     """給前端的近期交易(新到舊)。
 
     成功／失敗只列判定日落在市況視窗(近 `days` 個交易日)內的;
-    進行中／復甦／再突破不裁。帳本本身不刪歷史。
+    進行中／復甦不裁。舊的再突破列(status=reentered)不進清單,
+    新交易以 origin=recovered 標「復甦後再突破」。帳本本身不刪歷史。
     """
-    trades = list(ledger.get("trades", []))
+    trades = [t for t in ledger.get("trades", [])
+              if t.get("status") != TRADE_REENTERED]
     if close_df is not None and data_date:
         win_dates = _window_dates(close_df, data_date, days)
         keep = []

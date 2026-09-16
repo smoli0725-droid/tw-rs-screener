@@ -345,7 +345,7 @@ async function driveTrades(page, outDir) {
   await clickTab(page, 'breakouts');
   await page.locator('#tradeList').waitFor({ state: 'visible' });
   const allOn = await saveEvidence(outDir, '01-all-chips', page);
-  const chips = ['active', 'success', 'recovered', 'reentered'];
+  const chips = ['active', 'success', 'recovered'];
   for (const key of chips) {
     await page.locator(`#tradeChips .chip[data-trade="${key}"]`).click();
   }
@@ -363,7 +363,7 @@ async function driveTrades(page, outDir) {
     all_count: allOn.snap.tradeCount?.text,
     failed_only_count: onlyFailed.snap.tradeCount?.text,
     failed_sample: onlyFailed.snap.tradeItems.slice(0, 3),
-    note: 'Filter uses trade.status (失敗), not outcome. recovered/reentered rows with outcome=failed stay hidden.',
+    note: 'Filter uses trade.status (失敗), not outcome. recovered rows with outcome=failed stay hidden. reentered rows are not listed.',
     proof: ['01-all-chips.png', '02-failed-only.png'],
   };
 }

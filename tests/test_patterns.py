@@ -43,6 +43,7 @@ from breakout_tracker import (
     TRADE_SUCCESS,
     TRADE_FAILED,
     TRADE_RECOVERED,
+    TRADE_REENTERED,
 )
 from export_app_json import export_app_json
 from rs_calculator import (
@@ -675,6 +676,9 @@ def test_tracker_failure_then_recovery_then_reentry():
     new = [t for t in ledger["trades"] if t["status"] == TRADE_ACTIVE][0]
     assert new["origin"] == "recovered"
     assert new["pivot"] == 100.0
+    rows = recent_trades(ledger)
+    assert [r["status"] for r in rows] == [TRADE_ACTIVE]
+    assert rows[0]["origin"] == "recovered"
 
 
 def test_tracker_ignores_non_primary_and_no_duplicate():
@@ -703,6 +707,34 @@ def test_market_stats_window_by_outcome_date():
     m = market_stats(ledger, df, dates[-1])
     assert m["wins"] == 1 and m["losses"] == 1 and m["pending"] == 1
     assert m["win_rate"] == 0.5 and m["label"] == "市況中性"
+
+
+def test_recent_trades_hides_reentered():
+    """舊的 reentered 列不進前端清單; origin=recovered 的新交易仍出現。"""
+    ledger = empty_ledger()
+    df = _close_df([100.0] * 30)
+    dates = [x.date().isoformat() for x in df.index]
+    ledger["trades"] = [
+        {"id": "3441", "name": "聯一光", "status": TRADE_REENTERED, "outcome": TRADE_FAILED,
+         "outcome_date": dates[-5], "breakout_date": dates[-8], "origin": "pattern"},
+        {"id": "3441", "name": "聯一光", "status": TRADE_SUCCESS, "outcome": TRADE_SUCCESS,
+         "outcome_date": dates[-1], "breakout_date": dates[-3], "origin": "recovered"},
+        {"id": "3406", "name": "玉晶光", "status": TRADE_REENTERED, "outcome": TRADE_FAILED,
+         "outcome_date": dates[-4], "breakout_date": dates[-7], "origin": "pattern"},
+        {"id": "c", "status": TRADE_ACTIVE, "outcome": None, "outcome_date": None,
+         "breakout_date": dates[-2], "origin": "pattern"},
+        {"id": "d", "status": TRADE_RECOVERED, "outcome": TRADE_FAILED,
+         "outcome_date": dates[-6], "breakout_date": dates[-10], "origin": "pattern"},
+    ]
+    rows = recent_trades(ledger, df, dates[-1])
+    assert all(r["status"] != TRADE_REENTERED for r in rows)
+    recovered = [r for r in rows if r.get("origin") == "recovered"]
+    assert len(recovered) == 1
+    assert recovered[0]["id"] == "3441" and recovered[0]["status"] == TRADE_SUCCESS
+    ids = [r["id"] for r in rows]
+    assert "c" in ids and "d" in ids
+    assert ids.count("3406") == 0
+    assert ids.count("3441") == 1
 
 
 def test_recent_trades_hides_old_outcomes():

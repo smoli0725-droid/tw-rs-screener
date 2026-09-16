@@ -13,7 +13,7 @@
     rsQuery: '',
     statuses: new Set(['即將突破', '已突破']),
     patternTypes: new Set(),
-    tradeStatuses: new Set(['active', 'success', 'failed', 'recovered', 'reentered']),
+    tradeStatuses: new Set(['active', 'success', 'failed', 'recovered']),
     chartContext: null,
   };
 
@@ -289,7 +289,8 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
   function renderTrades() {
     const list = $('#tradeList');
     const b = state.breakouts;
-    const trades = (b && b.trades) || [];
+    // reentered 舊列不展示;復甦後再突破看 origin=recovered 的新交易
+    const trades = ((b && b.trades) || []).filter((t) => t.status !== 'reentered');
     let rows = trades;
     if (state.tradeStatuses.size) rows = rows.filter((t) => state.tradeStatuses.has(t.status));
     $('#tradeCount').textContent = `${rows.length} 筆（共 ${trades.length}）`;
