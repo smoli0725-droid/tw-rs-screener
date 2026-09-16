@@ -692,29 +692,6 @@
    "last_close": 38.5
   },
   {
-   "trade_id": "2409-2026-09-07-27.15",
-   "id": "2409",
-   "name": "友達",
-   "market": "上市",
-   "pattern": "作弊型態",
-   "pattern_label": "作弊型態",
-   "yf_ticker": "2409.TW",
-   "rs": 92,
-   "pivot": 27.15,
-   "breakout_date": "2026-09-07",
-   "breakout_close": 28.7,
-   "origin": "pattern",
-   "status": "success",
-   "outcome": "success",
-   "outcome_date": "2026-09-09",
-   "outcome_close": 30.5,
-   "outcome_pct": 12.34,
-   "peak_close": 30.5,
-   "trough_close": 28.7,
-   "last_date": "2026-09-09",
-   "last_close": 30.5
-  },
-  {
    "trade_id": "2855-2026-09-07-51.2",
    "id": "2855",
    "name": "統一證",
@@ -736,29 +713,6 @@
    "trough_close": 51.5,
    "last_date": "2026-09-16",
    "last_close": 51.6
-  },
-  {
-   "trade_id": "6021-2026-09-07-40.35",
-   "id": "6021",
-   "name": "美好證",
-   "market": "上櫃",
-   "pattern": "作弊型態",
-   "pattern_label": "作弊型態",
-   "yf_ticker": "6021.TWO",
-   "rs": 87,
-   "pivot": 40.35,
-   "breakout_date": "2026-09-07",
-   "breakout_close": 40.85,
-   "origin": "pattern",
-   "status": "success",
-   "outcome": "success",
-   "outcome_date": "2026-09-14",
-   "outcome_close": 44.75,
-   "outcome_pct": 10.9,
-   "peak_close": 44.75,
-   "trough_close": 40.85,
-   "last_date": "2026-09-14",
-   "last_close": 44.75
   },
   {
    "trade_id": "6292-2026-09-07-63.9",
@@ -1441,7 +1395,7 @@
    "date": "2026-09-07",
    "wins": 8,
    "losses": 3,
-   "pending": 12,
+   "pending": 10,
    "win_rate": 0.727,
    "label": "市況良好"
   },
@@ -1449,12 +1403,20 @@
    "date": "2026-09-08",
    "wins": 6,
    "losses": 3,
-   "pending": 13,
+   "pending": 11,
    "win_rate": 0.667,
    "label": "市況良好"
   },
   {
    "date": "2026-09-09",
+   "wins": 6,
+   "losses": 3,
+   "pending": 22,
+   "win_rate": 0.667,
+   "label": "市況良好"
+  },
+  {
+   "date": "2026-09-10",
    "wins": 7,
    "losses": 3,
    "pending": 23,
@@ -1462,43 +1424,35 @@
    "label": "市況良好"
   },
   {
-   "date": "2026-09-10",
-   "wins": 8,
-   "losses": 3,
-   "pending": 24,
-   "win_rate": 0.727,
-   "label": "市況良好"
-  },
-  {
    "date": "2026-09-11",
-   "wins": 13,
+   "wins": 12,
    "losses": 4,
-   "pending": 23,
-   "win_rate": 0.765,
+   "pending": 22,
+   "win_rate": 0.75,
    "label": "市況良好"
   },
   {
    "date": "2026-09-14",
-   "wins": 14,
+   "wins": 12,
    "losses": 9,
    "pending": 20,
-   "win_rate": 0.609,
-   "label": "市況良好"
+   "win_rate": 0.571,
+   "label": "市況中性"
   },
   {
    "date": "2026-09-15",
-   "wins": 13,
+   "wins": 11,
    "losses": 15,
    "pending": 16,
-   "win_rate": 0.464,
+   "win_rate": 0.423,
    "label": "市況不佳"
   },
   {
    "date": "2026-09-16",
-   "wins": 14,
+   "wins": 12,
    "losses": 15,
    "pending": 23,
-   "win_rate": 0.483,
+   "win_rate": 0.444,
    "label": "市況不佳"
   }
  ],
@@ -1507,11 +1461,11 @@
   "as_of": "2026-09-16",
   "window_days": 10,
   "window_start": "2026-09-03",
-  "wins": 14,
+  "wins": 12,
   "losses": 15,
   "pending": 23,
   "recovered": 8,
-  "win_rate": 0.483,
+  "win_rate": 0.444,
   "label": "市況不佳",
   "rules": {
    "buy_zone_pct": 5.0,

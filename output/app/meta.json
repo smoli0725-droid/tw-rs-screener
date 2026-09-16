@@ -35,11 +35,11 @@
     "as_of": "2026-09-16",
     "window_days": 10,
     "window_start": "2026-09-03",
-    "wins": 14,
+    "wins": 12,
     "losses": 15,
     "pending": 23,
     "recovered": 8,
-    "win_rate": 0.483,
+    "win_rate": 0.444,
     "label": "市況不佳",
     "rules": {
       "buy_zone_pct": 5.0,
