@@ -10,6 +10,12 @@ String fmtPctPoints(double p) => '${_pctPoints.format(p)}%';
 String fmtMoney(double v) => _money.format(v);
 String fmtDate(DateTime d) => _date.format(d);
 
+/// `2026-09-16` → `09-16`；對齊網站 `slice(5)`。
+String fmtMd(String? iso) {
+  if (iso == null || iso.isEmpty) return '—';
+  return iso.length >= 10 ? iso.substring(5, 10) : iso;
+}
+
 String yfTicker(String id, String market) {
   if (market.contains('櫃') || market.toUpperCase() == 'TPEX') {
     return '$id.TWO';

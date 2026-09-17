@@ -95,18 +95,18 @@ pytest tests/
 cd app
 flutter pub get
 flutter test
-flutter build apk --debug    # Android 可直接安裝
+flutter build apk --debug    # Android 可直接安裝（debug 簽名）
 # iOS(需 macOS + Xcode):
 flutter build ios --no-codesign
 ```
 
-預設資料來源:
+預設資料來源（與網站相同的每日 JSON）:
 
 ```
-https://raw.githubusercontent.com/smoli0725-droid/tw-rs-screener/main/output/app
+https://tradingvenator.pages.dev/data
 ```
 
-若 fork 到其他 repo,到 App「設定」改 raw URL。
+可在 App「設定」覆寫（GitHub raw `.../output/app` 仍可用）。HTTP 客戶端使用瀏覽器式 User-Agent，避免 Cloudflare 擋預設 Dart/Dio UA。突破清單會過濾 `status=reentered`。
 
 ## 網站版（`site/`，給 iPhone / 任何瀏覽器）
 

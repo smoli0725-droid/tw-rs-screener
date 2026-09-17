@@ -38,19 +38,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     });
   }
 
-  Future<void> _save() async {
+  Future<void> _save({required bool reset}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('data_base_url', _url.text.trim());
+    if (reset) {
+      await prefs.remove('data_base_url');
+      _url.text = AppConfig.defaultDataBaseUrl;
+    } else {
+      await prefs.setString(
+        'data_base_url',
+        AppConfig.normalizeDataBaseUrl(_url.text),
+      );
+      _url.text = AppConfig.normalizeDataBaseUrl(_url.text);
+    }
     await prefs.setInt('update_hour', _hour);
     await prefs.setInt('update_minute', _minute);
     await prefs.setBool('notify_enabled', _notify);
-    ref.invalidate(dataBaseUrlProvider);
-    ref.invalidate(metaProvider);
-    ref.invalidate(rs85Provider);
-    ref.invalidate(patternsProvider);
+    invalidateScreenerData(ref);
     await scheduleDailyRefresh(hour: _hour, minute: _minute, notify: _notify);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已儲存')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(reset ? '已恢復預設資料來源' : '已儲存')),
+      );
     }
   }
 
@@ -65,6 +73,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!_loaded) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    final metaAsync = ref.watch(metaProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('設定')),
       body: ListView(
@@ -94,27 +103,73 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ],
           ),
           const Divider(height: 32),
+          Text('帳號 / 雲端持股', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+            '尚未接上 Clerk／D1 雲端同步。持股目前只存在本機，沒有券商或 Confirm 下單 API。',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const Divider(height: 32),
+          Text('資料狀態', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          metaAsync.when(
+            data: (m) {
+              final fresh = !m.isFresh || m.isStale ? '可能過期' : '已更新';
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('資料日期：${m.dataDate ?? '—'}'),
+                  Text('新鮮度：$fresh'),
+                  if (m.message != null && m.message!.isNotEmpty)
+                    Text(m.message!, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              );
+            },
+            loading: () => const Text('載入中…'),
+            error: (e, _) => Text('無法讀取：$e', style: Theme.of(context).textTheme.bodySmall),
+          ),
+          const Divider(height: 32),
           Text('資料來源', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           TextField(
             controller: _url,
             decoration: const InputDecoration(
-              labelText: 'GitHub raw base URL',
-              helperText: '指向 output/app（不含結尾斜線亦可）',
+              labelText: '資料來源 URL',
+              helperText: '預設 TradingVenator /data（不含結尾斜線亦可）',
             ),
             maxLines: 2,
           ),
           const SizedBox(height: 8),
           Text(
-            '請把 OWNER/REPO 換成你的 GitHub 帳號與 repo 名稱，例如：\n'
-            'https://raw.githubusercontent.com/you/taiwan-rs/main/output/app',
+            '預設 ${AppConfig.defaultDataBaseUrl}\n'
+            '也可改成 GitHub raw，例如：\n'
+            'https://raw.githubusercontent.com/smoli0725-droid/tw-rs-screener/main/output/app',
             style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => _save(reset: false),
+                  child: const Text('儲存並重新載入'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _save(reset: true),
+                  child: const Text('恢復預設'),
+                ),
+              ),
+            ],
           ),
           const Divider(height: 32),
           Text('每日自動更新', style: Theme.of(context).textTheme.titleMedium),
           ListTile(
+            contentPadding: EdgeInsets.zero,
             title: Text('時間 $_hour:${_minute.toString().padLeft(2, '0')}（裝置本地時區）'),
-            subtitle: const Text('建議設為 17:00；iOS 背景執行時機由系統決定'),
+            subtitle: const Text('本機通知提醒，不是 FCM。建議 17:00；背景執行時機由系統決定'),
             trailing: const Icon(Icons.schedule),
             onTap: () async {
               final t = await showTimePicker(
@@ -130,12 +185,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             },
           ),
           SwitchListTile(
+            contentPadding: EdgeInsets.zero,
             title: const Text('推播當日損益通知'),
+            subtitle: const Text('本機排程；未接 Firebase Cloud Messaging'),
             value: _notify,
             onChanged: (v) => setState(() => _notify = v),
           ),
-          const SizedBox(height: 16),
-          FilledButton(onPressed: _save, child: const Text('儲存設定')),
+          const Divider(height: 32),
+          Text('即時報價', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+            '尚未接上 Confirm 或券商即時報價。持股現價先用 Yahoo，失敗時改用 /data 的 RS／突破收盤價。',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );

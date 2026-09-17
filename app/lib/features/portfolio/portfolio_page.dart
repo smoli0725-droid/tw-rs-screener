@@ -23,11 +23,31 @@ final positionsProvider = FutureProvider<List<Position>>((ref) async {
   final trades = await ref.watch(tradesProvider.future);
   final positions = buildPositions(trades);
   if (positions.isEmpty) return positions;
+
+  final fallback = <String, double>{};
+  try {
+    for (final s in await ref.watch(rs85Provider.future)) {
+      fallback[s.id] = s.close;
+    }
+  } catch (_) {}
+  try {
+    for (final p in await ref.watch(patternsProvider.future)) {
+      fallback[p.id] ??= p.close;
+    }
+  } catch (_) {}
+  try {
+    final bundle = await ref.watch(breakoutsProvider.future);
+    for (final t in bundle?.trades ?? const <BreakoutTrade>[]) {
+      if (t.lastClose != null) fallback[t.id] ??= t.lastClose!;
+    }
+  } catch (_) {}
+
   final yahoo = ref.read(yahooProvider);
-  final prices = await yahoo.quotes([
+  final live = await yahoo.quotes([
     for (final p in positions) (id: p.symbol, market: p.market),
   ]);
-  return buildPositions(trades, prices: prices);
+  // Yahoo 有值時覆蓋 /data 收盤；Confirm／券商即時報價尚未接入。
+  return buildPositions(trades, prices: {...fallback, ...live});
 });
 
 class PortfolioPage extends ConsumerWidget {
@@ -82,7 +102,7 @@ class PortfolioPage extends ConsumerWidget {
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const _FreshnessBanner(
               meta: null,
-              fallback: '無法讀取資料日期（請到設定確認 GitHub raw URL）',
+              fallback: '無法讀取資料日期（請到設定確認資料來源 URL）',
             ),
           ),
           Expanded(

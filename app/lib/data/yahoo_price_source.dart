@@ -6,7 +6,7 @@ import '../domain/models.dart';
 
 class YahooPriceSource {
   YahooPriceSource({Dio? dio}) : _dio = dio ?? Dio(BaseOptions(
-          headers: {'User-Agent': 'Mozilla/5.0 TaiwanRsApp'},
+          headers: {'User-Agent': AppConfig.httpUserAgent},
           connectTimeout: const Duration(seconds: 20),
           receiveTimeout: const Duration(seconds: 30),
         ));

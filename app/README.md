@@ -1,16 +1,24 @@
-# taiwan_rs_app
+# taiwan_rs_app（閃電選股 · FlashPick）
 
-A new Flutter project.
+台股 RS 選股 Flutter App。資料預設讀 [TradingVenator `/data`](https://tradingvenator.pages.dev/data)。
 
-## Getting Started
+## 開發
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter test
+flutter build apk --debug
+```
 
-A few resources to get you started if this is your first Flutter project:
+Debug APK（debug 簽名，可直接 sideload，無 Play 上傳金鑰）：
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+flutter build apk --debug --split-per-abi
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- 多數手機（arm64）：`build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk`
+- 全 ABI：`build/app/outputs/flutter-apk/app-debug.apk`
+
+安裝：把 APK 傳到 Android 手機 → 允許「未知來源」→ 開啟檔案安裝。
+
+設定頁可覆寫資料來源 URL；恢復預設會清掉本機覆寫。
