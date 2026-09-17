@@ -17,7 +17,7 @@ class StockChartPage extends ConsumerStatefulWidget {
     required this.market,
     this.pivot,
     this.annotations = const [],
-    this.preferRepoOhlcv = false,
+    this.preferRepoOhlcv = true,
   });
 
   final String id;
@@ -25,6 +25,7 @@ class StockChartPage extends ConsumerStatefulWidget {
   final String market;
   final double? pivot;
   final List<Map<String, dynamic>> annotations;
+  /// 預設先讀 `/data/ohlcv/{id}.json`，失敗再退回 Yahoo。
   final bool preferRepoOhlcv;
 
   @override
@@ -32,7 +33,7 @@ class StockChartPage extends ConsumerStatefulWidget {
 }
 
 class _StockChartPageState extends ConsumerState<StockChartPage> {
-  late Future<List<Candle>> _future;
+  late Future<({List<Candle> candles, List<Map<String, dynamic>> annotations})> _future;
 
   @override
   void initState() {
@@ -40,14 +41,18 @@ class _StockChartPageState extends ConsumerState<StockChartPage> {
     _future = _load();
   }
 
-  Future<List<Candle>> _load() async {
+  Future<({List<Candle> candles, List<Map<String, dynamic>> annotations})> _load() async {
     if (widget.preferRepoOhlcv) {
       try {
-        final candles = await ref.read(githubDataSourceProvider).fetchOhlcv(widget.id);
-        if (candles.isNotEmpty) return candles;
+        final bundle = await ref.read(githubDataSourceProvider).fetchOhlcvBundle(widget.id);
+        if (bundle.candles.isNotEmpty) {
+          final notes = widget.annotations.isNotEmpty ? widget.annotations : bundle.annotations;
+          return (candles: bundle.candles, annotations: notes);
+        }
       } catch (_) {}
     }
-    return ref.read(yahooProvider).history(widget.id, widget.market);
+    final candles = await ref.read(yahooProvider).history(widget.id, widget.market);
+    return (candles: candles, annotations: widget.annotations);
   }
 
   @override
@@ -79,7 +84,7 @@ class _StockChartPageState extends ConsumerState<StockChartPage> {
           ),
         ],
       ),
-      body: FutureBuilder<List<Candle>>(
+      body: FutureBuilder<({List<Candle> candles, List<Map<String, dynamic>> annotations})>(
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
@@ -88,7 +93,8 @@ class _StockChartPageState extends ConsumerState<StockChartPage> {
           if (snap.hasError) {
             return Center(child: Text('載入失敗：${snap.error}'));
           }
-          final candles = snap.data ?? [];
+          final candles = snap.data?.candles ?? [];
+          final annotations = snap.data?.annotations ?? const <Map<String, dynamic>>[];
           if (candles.isEmpty) {
             return const Center(child: Text('無 K 線資料'));
           }
@@ -107,13 +113,13 @@ class _StockChartPageState extends ConsumerState<StockChartPage> {
                 Expanded(flex: 3, child: _CandleChart(candles: view, pivot: widget.pivot)),
                 const SizedBox(height: 8),
                 Expanded(flex: 1, child: _VolumeChart(candles: view)),
-                if (widget.annotations.isNotEmpty) ...[
+                if (annotations.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text('標註', style: Theme.of(context).textTheme.titleSmall),
                   Wrap(
                     spacing: 6,
                     children: [
-                      for (final a in widget.annotations)
+                      for (final a in annotations)
                         Chip(
                           label: Text(
                             '${a['type']}'

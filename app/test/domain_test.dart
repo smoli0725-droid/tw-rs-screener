@@ -166,6 +166,27 @@ void main() {
       expect(p.status, '即將突破');
       expect(p.annotations.length, 1);
       expect(p.primary, isTrue);
+      expect(p.recovered, isFalse);
+    });
+
+    test('MetaInfo parses nested market', () {
+      final m = MetaInfo.fromJson({
+        'data_date': '2026-09-16',
+        'generated_at': '2026-09-17T01:00:00+08:00',
+        'is_fresh': true,
+        'counts': {'rs85': 291, 'near_breakout': 6},
+        'market': {
+          'win_rate': 0.444,
+          'label': '市況不佳',
+          'wins': 12,
+          'losses': 15,
+          'pending': 23,
+          'window_days': 10,
+        },
+      });
+      expect(m.market?.label, '市況不佳');
+      expect(m.market?.winRatePct, 44);
+      expect(m.market?.tone, 'bad');
     });
   });
 

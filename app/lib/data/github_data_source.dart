@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/config.dart';
+import '../core/json_num.dart';
+import '../domain/breakout_list.dart';
 import '../domain/models.dart';
 import '../domain/pattern_list.dart';
 
@@ -12,36 +14,81 @@ final prefsProvider = FutureProvider<SharedPreferences>((ref) async {
 
 final dataBaseUrlProvider = Provider<String>((ref) {
   final prefs = ref.watch(prefsProvider).valueOrNull;
-  return prefs?.getString('data_base_url') ?? AppConfig.defaultDataBaseUrl;
+  final raw = prefs?.getString('data_base_url') ?? AppConfig.defaultDataBaseUrl;
+  return AppConfig.normalizeDataBaseUrl(raw);
 });
 
+Dio createAppDio() {
+  return Dio(
+    BaseOptions(
+      headers: {
+        'User-Agent': AppConfig.httpUserAgent,
+        'Accept': 'application/json,text/plain,*/*',
+      },
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 30),
+    ),
+  );
+}
+
 class GitHubDataSource {
-  GitHubDataSource(this.baseUrl, {Dio? dio}) : _dio = dio ?? Dio();
+  GitHubDataSource(String baseUrl, {Dio? dio})
+      : baseUrl = AppConfig.normalizeDataBaseUrl(baseUrl),
+        _dio = dio ?? createAppDio();
 
   final String baseUrl;
   final Dio _dio;
 
+  String _url(String path) => '$baseUrl$path';
+
+  Future<Map<String, dynamic>> _getMap(String path) async {
+    final r = await _dio.get<dynamic>(_url(path));
+    final map = jsonMap(r.data);
+    if (map == null) {
+      throw StateError('Expected JSON object at $path');
+    }
+    return map;
+  }
+
+  Future<List<dynamic>> _getList(String path) async {
+    final r = await _dio.get<dynamic>(_url(path));
+    if (r.data is List) return r.data as List<dynamic>;
+    throw StateError('Expected JSON array at $path');
+  }
+
   Future<MetaInfo> fetchMeta() async {
-    final r = await _dio.get<Map<String, dynamic>>('$baseUrl${AppConfig.metaPath}');
-    return MetaInfo.fromJson(r.data!);
+    return MetaInfo.fromJson(await _getMap(AppConfig.metaPath));
   }
 
   Future<List<RsStock>> fetchRs85() async {
-    final r = await _dio.get<List<dynamic>>('$baseUrl${AppConfig.rs85Path}');
-    return r.data!.map((e) => RsStock.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    final rows = await _getList(AppConfig.rs85Path);
+    return [
+      for (final e in rows)
+        if (e is Map) RsStock.fromJson(Map<String, dynamic>.from(e)),
+    ];
   }
 
   Future<List<PatternHit>> fetchPatterns() async {
-    final r = await _dio.get<List<dynamic>>('$baseUrl${AppConfig.patternsPath}');
-    return patternHitsFromJsonList(r.data!);
+    return patternHitsFromJsonList(await _getList(AppConfig.patternsPath));
+  }
+
+  /// `breakouts.json` 可選；404 時回 null（與網站 `fetchOptional` 相同）。
+  Future<BreakoutBundle?> fetchBreakouts() async {
+    try {
+      final r = await _dio.get<dynamic>(_url(AppConfig.breakoutsPath));
+      return breakoutBundleFromJson(r.data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  Future<OhlcvBundle> fetchOhlcvBundle(String id) async {
+    return OhlcvBundle.fromJson(await _getMap(AppConfig.ohlcvPath(id)));
   }
 
   Future<List<Candle>> fetchOhlcv(String id) async {
-    final r = await _dio.get<Map<String, dynamic>>('$baseUrl${AppConfig.ohlcvPath(id)}');
-    final candles = (r.data!['candles'] as List)
-        .map((e) => Candle.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
-    return candles;
+    return (await fetchOhlcvBundle(id)).candles;
   }
 }
 
@@ -60,3 +107,21 @@ final rs85Provider = FutureProvider<List<RsStock>>((ref) async {
 final patternsProvider = FutureProvider<List<PatternHit>>((ref) async {
   return ref.watch(githubDataSourceProvider).fetchPatterns();
 });
+
+final breakoutsProvider = FutureProvider<BreakoutBundle?>((ref) async {
+  return ref.watch(githubDataSourceProvider).fetchBreakouts();
+});
+
+final visibleBreakoutTradesProvider = Provider<AsyncValue<List<BreakoutTrade>>>((ref) {
+  return ref.watch(breakoutsProvider).whenData((bundle) {
+    return visibleBreakoutTrades(bundle?.trades ?? const []);
+  });
+});
+
+void invalidateScreenerData(WidgetRef ref) {
+  ref.invalidate(dataBaseUrlProvider);
+  ref.invalidate(metaProvider);
+  ref.invalidate(rs85Provider);
+  ref.invalidate(patternsProvider);
+  ref.invalidate(breakoutsProvider);
+}

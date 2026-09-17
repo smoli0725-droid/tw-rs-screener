@@ -1,3 +1,52 @@
+import '../core/json_num.dart';
+
+class MarketSnapshot {
+  MarketSnapshot({
+    this.asOf,
+    this.windowDays = 10,
+    this.windowStart,
+    this.wins = 0,
+    this.losses = 0,
+    this.pending = 0,
+    this.recovered = 0,
+    this.winRate,
+    this.label,
+  });
+
+  final String? asOf;
+  final int windowDays;
+  final String? windowStart;
+  final int wins;
+  final int losses;
+  final int pending;
+  final int recovered;
+  final double? winRate;
+  final String? label;
+
+  int? get winRatePct => winRate == null ? null : (winRate! * 100).round();
+
+  /// ≥60% 良好、50~60% 中性、<50% 不佳（與網站 `renderMarket` 相同）。
+  String get tone {
+    final pct = winRatePct;
+    if (pct == null) return 'unknown';
+    if (pct >= 60) return 'good';
+    if (pct >= 50) return 'neutral';
+    return 'bad';
+  }
+
+  factory MarketSnapshot.fromJson(Map<String, dynamic> j) => MarketSnapshot(
+        asOf: j['as_of']?.toString(),
+        windowDays: jsonInt(j['window_days']) ?? 10,
+        windowStart: j['window_start']?.toString(),
+        wins: jsonInt(j['wins']) ?? 0,
+        losses: jsonInt(j['losses']) ?? 0,
+        pending: jsonInt(j['pending']) ?? 0,
+        recovered: jsonInt(j['recovered']) ?? 0,
+        winRate: jsonDouble(j['win_rate']),
+        label: j['label']?.toString(),
+      );
+}
+
 class MetaInfo {
   MetaInfo({
     required this.dataDate,
@@ -5,6 +54,7 @@ class MetaInfo {
     required this.isFresh,
     this.message,
     this.counts = const {},
+    this.market,
   });
 
   final String? dataDate;
@@ -12,13 +62,15 @@ class MetaInfo {
   final bool isFresh;
   final String? message;
   final Map<String, dynamic> counts;
+  final MarketSnapshot? market;
 
   factory MetaInfo.fromJson(Map<String, dynamic> j) => MetaInfo(
         dataDate: j['data_date']?.toString(),
         generatedAt: j['generated_at']?.toString(),
         isFresh: j['is_fresh'] != false,
         message: j['message']?.toString(),
-        counts: Map<String, dynamic>.from(j['counts'] as Map? ?? {}),
+        counts: jsonMap(j['counts']) ?? const {},
+        market: jsonMap(j['market']) == null ? null : MarketSnapshot.fromJson(jsonMap(j['market'])!),
       );
 
   bool get isStale {
@@ -80,16 +132,16 @@ class RsStock {
         name: '${j['name']}',
         market: '${j['market'] ?? ''}',
         industry: '${j['industry'] ?? ''}',
-        rs: (j['rs'] as num).toInt(),
-        close: (j['close'] as num).toDouble(),
-        templatePass: j['template_pass'] == true,
-        distMa50Pct: (j['dist_ma50_pct'] as num?)?.toDouble(),
-        avgVol20: (j['avg_vol_20'] as num?)?.toDouble(),
-        patterns: (j['patterns'] as List?)?.map((e) => '$e').toList() ?? const [],
-        rank: (j['rank'] as num?)?.toInt(),
-        ret3mPct: (j['ret_3m_pct'] as num?)?.toDouble(),
-        ret6mPct: (j['ret_6m_pct'] as num?)?.toDouble(),
-        ret12mPct: (j['ret_12m_pct'] as num?)?.toDouble(),
+        rs: jsonInt(j['rs']) ?? 0,
+        close: jsonDouble(j['close']) ?? 0,
+        templatePass: jsonBool(j['template_pass']),
+        distMa50Pct: jsonDouble(j['dist_ma50_pct']),
+        avgVol20: jsonDouble(j['avg_vol_20']),
+        patterns: jsonList(j['patterns']).map((e) => '$e').toList(),
+        rank: jsonInt(j['rank']),
+        ret3mPct: jsonDouble(j['ret_3m_pct']),
+        ret6mPct: jsonDouble(j['ret_6m_pct']),
+        ret12mPct: jsonDouble(j['ret_12m_pct']),
       );
 }
 
@@ -115,6 +167,10 @@ class PatternHit {
     this.annotations = const [],
     this.position,
     this.primary = true,
+    this.recovered = false,
+    this.structureDate,
+    this.breakoutDate,
+    this.daysSinceBreakout,
   });
 
   final String id;
@@ -139,32 +195,43 @@ class PatternHit {
   final String? position;
   /// 與網站 `renderPatterns` 相同：僅 `primary === false` 視為次要列。缺欄當 true。
   final bool primary;
+  final bool recovered;
+  final String? structureDate;
+  final String? breakoutDate;
+  final int? daysSinceBreakout;
 
-  factory PatternHit.fromJson(Map<String, dynamic> j) => PatternHit(
-        id: '${j['id']}',
-        name: '${j['name']}',
-        market: '${j['market'] ?? ''}',
-        industry: '${j['industry'] ?? ''}',
-        rs: (j['rs'] as num).toInt(),
-        close: (j['close'] as num).toDouble(),
-        pattern: '${j['pattern'] ?? ''}',
-        patternLabel: '${j['pattern_label'] ?? j['pattern'] ?? ''}',
-        pivot: (j['pivot'] as num?)?.toDouble() ?? 0,
-        distPivotPct: (j['dist_pivot_pct'] as num?)?.toDouble() ?? 0,
-        status: '${j['status'] ?? '整理中'}',
-        score: (j['score'] as num?)?.toDouble(),
-        contraction: j['contraction']?.toString(),
-        volDryRatio: (j['vol_dry_ratio'] as num?)?.toDouble(),
-        baseWeeks: (j['base_weeks'] as num?)?.toDouble(),
-        depthPct: (j['depth_pct'] as num?)?.toDouble(),
-        templatePass: j['template_pass'] == true,
-        annotations: (j['annotations'] as List?)
-                ?.map((e) => Map<String, dynamic>.from(e as Map))
-                .toList() ??
-            const [],
-        position: (j['detail'] is Map) ? (j['detail'] as Map)['position']?.toString() : null,
-        primary: j['primary'] != false,
-      );
+  factory PatternHit.fromJson(Map<String, dynamic> j) {
+    final detail = jsonMap(j['detail']);
+    return PatternHit(
+      id: '${j['id']}',
+      name: '${j['name']}',
+      market: '${j['market'] ?? ''}',
+      industry: '${j['industry'] ?? ''}',
+      rs: jsonInt(j['rs']) ?? 0,
+      close: jsonDouble(j['close']) ?? 0,
+      pattern: '${j['pattern'] ?? ''}',
+      patternLabel: '${j['pattern_label'] ?? j['pattern'] ?? ''}',
+      pivot: jsonDouble(j['pivot']) ?? 0,
+      distPivotPct: jsonDouble(j['dist_pivot_pct']) ?? 0,
+      status: '${j['status'] ?? '整理中'}',
+      score: jsonDouble(j['score']),
+      contraction: j['contraction']?.toString(),
+      volDryRatio: jsonDouble(j['vol_dry_ratio']),
+      baseWeeks: jsonDouble(j['base_weeks']),
+      depthPct: jsonDouble(j['depth_pct']),
+      templatePass: jsonBool(j['template_pass']),
+      annotations: jsonList(j['annotations'])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList(),
+      position: detail?['position']?.toString(),
+      primary: j['primary'] != false,
+      recovered: jsonBool(j['recovered']),
+      structureDate: j['structure_date']?.toString(),
+      breakoutDate: j['breakout_date']?.toString(),
+      daysSinceBreakout: jsonInt(j['days_since_breakout']),
+    );
+  }
 }
 
 class Candle {
@@ -192,14 +259,134 @@ class Candle {
 
   factory Candle.fromJson(Map<String, dynamic> j) => Candle(
         date: DateTime.parse('${j['date']}'),
-        open: (j['open'] as num).toDouble(),
-        high: (j['high'] as num).toDouble(),
-        low: (j['low'] as num).toDouble(),
-        close: (j['close'] as num).toDouble(),
-        volume: (j['volume'] as num?)?.toDouble() ?? 0,
-        ma50: (j['ma50'] as num?)?.toDouble(),
-        ma150: (j['ma150'] as num?)?.toDouble(),
-        ma200: (j['ma200'] as num?)?.toDouble(),
+        open: jsonDouble(j['open']) ?? 0,
+        high: jsonDouble(j['high']) ?? 0,
+        low: jsonDouble(j['low']) ?? 0,
+        close: jsonDouble(j['close']) ?? 0,
+        volume: jsonDouble(j['volume']) ?? 0,
+        ma50: jsonDouble(j['ma50'] ?? j['ma_50']),
+        ma150: jsonDouble(j['ma150'] ?? j['ma_150']),
+        ma200: jsonDouble(j['ma200'] ?? j['ma_200']),
+      );
+}
+
+class OhlcvBundle {
+  OhlcvBundle({required this.candles, this.annotations = const [], this.ticker});
+
+  final List<Candle> candles;
+  final List<Map<String, dynamic>> annotations;
+  final String? ticker;
+
+  factory OhlcvBundle.fromJson(Map<String, dynamic> j) => OhlcvBundle(
+        ticker: j['ticker']?.toString(),
+        candles: jsonList(j['candles'])
+            .whereType<Map>()
+            .map((e) => Candle.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
+        annotations: jsonList(j['annotations'])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
+      );
+}
+
+class BreakoutTrade {
+  BreakoutTrade({
+    required this.tradeId,
+    required this.id,
+    required this.name,
+    required this.market,
+    required this.pattern,
+    required this.patternLabel,
+    required this.pivot,
+    required this.status,
+    this.rs,
+    this.breakoutDate,
+    this.breakoutClose,
+    this.outcome,
+    this.outcomeDate,
+    this.outcomeClose,
+    this.outcomePct,
+    this.lastDate,
+    this.lastClose,
+    this.origin,
+  });
+
+  final String tradeId;
+  final String id;
+  final String name;
+  final String market;
+  final String pattern;
+  final String patternLabel;
+  final double pivot;
+  final String status;
+  final int? rs;
+  final String? breakoutDate;
+  final double? breakoutClose;
+  final String? outcome;
+  final String? outcomeDate;
+  final double? outcomeClose;
+  final double? outcomePct;
+  final String? lastDate;
+  final double? lastClose;
+  final String? origin;
+
+  bool get isRecoveredOrigin => origin == 'recovered';
+
+  double? get distPivotPct {
+    if (lastClose == null || pivot == 0) return null;
+    return (lastClose! / pivot - 1) * 100;
+  }
+
+  String get statusLabel => switch (status) {
+        'active' => '進行中',
+        'success' => '成功',
+        'failed' => '失敗',
+        'recovered' => '復甦',
+        'reentered' => '再突破',
+        _ => status,
+      };
+
+  factory BreakoutTrade.fromJson(Map<String, dynamic> j) => BreakoutTrade(
+        tradeId: '${j['trade_id'] ?? j['id']}',
+        id: '${j['id']}',
+        name: '${j['name'] ?? ''}',
+        market: '${j['market'] ?? ''}',
+        pattern: '${j['pattern'] ?? ''}',
+        patternLabel: '${j['pattern_label'] ?? j['pattern'] ?? ''}',
+        pivot: jsonDouble(j['pivot']) ?? 0,
+        status: '${j['status'] ?? ''}',
+        rs: jsonInt(j['rs']),
+        breakoutDate: j['breakout_date']?.toString(),
+        breakoutClose: jsonDouble(j['breakout_close']),
+        outcome: j['outcome']?.toString(),
+        outcomeDate: j['outcome_date']?.toString(),
+        outcomeClose: jsonDouble(j['outcome_close']),
+        outcomePct: jsonDouble(j['outcome_pct']),
+        lastDate: j['last_date']?.toString(),
+        lastClose: jsonDouble(j['last_close']),
+        origin: j['origin']?.toString(),
+      );
+}
+
+class BreakoutBundle {
+  BreakoutBundle({
+    this.asOf,
+    this.market,
+    this.trades = const [],
+  });
+
+  final String? asOf;
+  final MarketSnapshot? market;
+  final List<BreakoutTrade> trades;
+
+  factory BreakoutBundle.fromJson(Map<String, dynamic> j) => BreakoutBundle(
+        asOf: j['as_of']?.toString(),
+        market: jsonMap(j['market']) == null ? null : MarketSnapshot.fromJson(jsonMap(j['market'])!),
+        trades: jsonList(j['trades'])
+            .whereType<Map>()
+            .map((e) => BreakoutTrade.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
       );
 }
 
