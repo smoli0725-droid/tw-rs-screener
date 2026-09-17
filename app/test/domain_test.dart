@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:taiwan_rs_app/domain/models.dart';
+import 'package:taiwan_rs_app/domain/pattern_list.dart';
 import 'package:taiwan_rs_app/domain/position_builder.dart';
 import 'package:taiwan_rs_app/domain/portfolio_metrics.dart';
 
@@ -164,6 +165,73 @@ void main() {
       });
       expect(p.status, '即將突破');
       expect(p.annotations.length, 1);
+      expect(p.primary, isTrue);
+    });
+  });
+
+  group('pattern_list (site renderPatterns parity)', () {
+    const statuses = ['即將突破', '已突破', '整理中'];
+
+    Map<String, dynamic> row({
+      required String id,
+      required String status,
+      String pattern = 'VCP',
+      bool? primary,
+    }) {
+      final j = <String, dynamic>{
+        'id': id,
+        'name': id,
+        'market': '上市',
+        'industry': '半導體',
+        'rs': 90,
+        'close': 100,
+        'pattern': pattern,
+        'pattern_label': pattern,
+        'pivot': 110,
+        'dist_pivot_pct': -5.0,
+        'status': status,
+      };
+      if (primary != null) j['primary'] = primary;
+      return j;
+    }
+
+    test('legacy multi-row same id keeps first status only', () {
+      final hits = patternHitsFromJsonList([
+        row(id: '2059', status: '即將突破', pattern: '高聳旗形', primary: true),
+        row(id: '2059', status: '整理中', pattern: '作弊型態', primary: true),
+        row(id: '2330', status: '已突破', pattern: 'VCP', primary: true),
+      ]);
+      expect(hits.map((h) => h.id).toList(), ['2059', '2330']);
+      expect(hits.first.status, '即將突破');
+      expect(hits.map((h) => h.id).toSet().length, hits.length);
+
+      final idsByStatus = {
+        for (final s in statuses) s: hits.where((h) => h.status == s).map((h) => h.id).toSet(),
+      };
+      expect(idsByStatus['即將突破']!.intersection(idsByStatus['整理中']!), isEmpty);
+      expect(idsByStatus['即將突破']!.intersection(idsByStatus['已突破']!), isEmpty);
+      expect(idsByStatus['已突破']!.intersection(idsByStatus['整理中']!), isEmpty);
+    });
+
+    test('drops primary:false then first-wins remaining id', () {
+      final hits = patternHitsFromJsonList([
+        row(id: '2330', status: '整理中', pattern: '作弊型態', primary: false),
+        row(id: '2330', status: '即將突破', pattern: 'VCP', primary: true),
+        row(id: '2454', status: '已突破', primary: false),
+      ]);
+      expect(hits, hasLength(1));
+      expect(hits.single.id, '2330');
+      expect(hits.single.status, '即將突破');
+      expect(hits.single.pattern, 'VCP');
+    });
+
+    test('missing primary is kept (same as site !== false)', () {
+      final hits = patternHitsFromJsonList([
+        row(id: '2303', status: '已突破'),
+      ]);
+      expect(hits, hasLength(1));
+      expect(hits.single.primary, isTrue);
     });
   });
 }
+
