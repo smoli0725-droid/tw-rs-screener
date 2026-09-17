@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/config.dart';
 import '../domain/models.dart';
+import '../domain/pattern_list.dart';
 
 final prefsProvider = FutureProvider<SharedPreferences>((ref) async {
   return SharedPreferences.getInstance();
@@ -32,9 +33,7 @@ class GitHubDataSource {
 
   Future<List<PatternHit>> fetchPatterns() async {
     final r = await _dio.get<List<dynamic>>('$baseUrl${AppConfig.patternsPath}');
-    return r.data!
-        .map((e) => PatternHit.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    return patternHitsFromJsonList(r.data!);
   }
 
   Future<List<Candle>> fetchOhlcv(String id) async {

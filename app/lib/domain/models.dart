@@ -114,6 +114,7 @@ class PatternHit {
     this.templatePass = false,
     this.annotations = const [],
     this.position,
+    this.primary = true,
   });
 
   final String id;
@@ -136,6 +137,8 @@ class PatternHit {
   final List<Map<String, dynamic>> annotations;
   /// 作弊型態的停頓區位置（低位 / 中段 3-C / 上緣（杯柄））；其他型態為 null
   final String? position;
+  /// 與網站 `renderPatterns` 相同：僅 `primary === false` 視為次要列。缺欄當 true。
+  final bool primary;
 
   factory PatternHit.fromJson(Map<String, dynamic> j) => PatternHit(
         id: '${j['id']}',
@@ -160,6 +163,7 @@ class PatternHit {
                 .toList() ??
             const [],
         position: (j['detail'] is Map) ? (j['detail'] as Map)['position']?.toString() : null,
+        primary: j['primary'] != false,
       );
 }
 
