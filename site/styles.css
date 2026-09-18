@@ -270,11 +270,13 @@ dialog::backdrop { background: rgba(8, 30, 36, 0.45); }
 }
 .cover-preview[hidden] { display: none; }
 #lessonCoverStatus.cover-status-error { color: var(--up); }
-#lessonCoverUrlDetails { margin-top: 8px; }
-#lessonCoverUrlDetails summary {
-  cursor: pointer; color: var(--muted); font-size: 0.85rem; font-weight: 600;
+.cover-advanced { margin-top: 6px; }
+.cover-advanced summary {
+  cursor: pointer; color: var(--muted); font-size: 0.75rem; font-weight: 500;
+  list-style: none;
 }
-#lessonCoverUrlDetails label { margin: 8px 0 0; }
+.cover-advanced summary::-webkit-details-marker { display: none; }
+.cover-advanced label { margin: 8px 0 0; }
 
 .app-shell { display: none; }
 body.signed-in .app-shell { display: block; }

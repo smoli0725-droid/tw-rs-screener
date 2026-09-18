@@ -99,7 +99,14 @@ test('site nav includes 教學, cover upload, delete dialog, not a public compos
   assert.match(INDEX, /id="deleteLessonDialog"/);
   assert.match(INDEX, /id="confirmDeleteLessonBtn"/);
   assert.match(INDEX, /js\/teaching\.js/);
-  assert.match(INDEX, /site\/content\/lessons\.json/);
+  assert.doesNotMatch(INDEX, /site\/content\/lessons\.json/);
+  assert.doesNotMatch(INDEX, /或貼上圖片網址/);
+  assert.doesNotMatch(INDEX, /封面圖網址/);
+  assert.match(INDEX, />進階</);
+  const README = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+  assert.match(README, /全在網站上/);
+  assert.doesNotMatch(README, /兩種寫入方式/);
+  assert.doesNotMatch(README, /改檔部署（最穩）/);
   assert.doesNotMatch(INDEX, /youtube|iframe|video/i);
   assert.match(APP_JS, /showView/);
   assert.match(APP_JS, /RS_TEACHING/);
@@ -113,4 +120,5 @@ test('site nav includes 教學, cover upload, delete dialog, not a public compos
   assert.match(STYLES, /\.cover-file-btn/);
   assert.match(TEACHING_JS, /uploadLessonCover/);
   assert.match(TEACHING_JS, /尚未設定封面儲存空間/);
+  assert.doesNotMatch(TEACHING_JS, /請改 site\/content\/lessons\.json/);
 });

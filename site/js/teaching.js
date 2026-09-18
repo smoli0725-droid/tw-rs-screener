@@ -305,7 +305,7 @@ window.RS_TEACHING = (() => {
       return null;
     }
     if (!window.RS_API || typeof window.RS_API.uploadLessonCover !== 'function') {
-      setCoverStatus('無法上傳：沒有 API。可貼網址，或看 README 設定 R2。', true);
+      setCoverStatus('無法上傳封面。請用已部署的網站、站長帳號登入後再試。', true);
       return null;
     }
     let localUrl = '';
@@ -371,10 +371,12 @@ window.RS_TEACHING = (() => {
     form.published_at.value = lesson && lesson.published_at ? lesson.published_at : new Date().toISOString().slice(0, 10);
     const fileInput = $('#lessonCoverFile');
     if (fileInput) fileInput.value = '';
+    const fallback = $('#lessonCoverUrlFallback');
+    if (fallback) fallback.value = '';
     setCoverStatus('');
     showCoverPreview(existing);
     const details = $('#lessonCoverUrlDetails');
-    if (details) details.open = Boolean(existing && !existing.startsWith('/covers/'));
+    if (details) details.open = false;
     dialog.showModal();
   }
 
@@ -415,7 +417,7 @@ window.RS_TEACHING = (() => {
     const coverInput = String(form.cover_url.value || '').trim();
     const cover_url = normalizeCoverUrl(coverInput);
     if (coverInput && !cover_url) {
-      toast('封面請上傳圖片，或貼 https 圖片網址／網站內路徑');
+      toast('請重新選擇圖片上傳');
       return;
     }
     if (!title || !body) {
@@ -437,7 +439,7 @@ window.RS_TEACHING = (() => {
     } catch (err) {
       console.error(err);
       if (err && err.status === 403) toast('只有站長可以編輯');
-      else toast('無法線上儲存，請改 site/content/lessons.json 後部署');
+      else toast('無法儲存。請用站長帳號在已部署的網站上再試。');
     }
   }
 
@@ -483,7 +485,7 @@ window.RS_TEACHING = (() => {
     } catch (err) {
       console.error(err);
       if (err && err.status === 403) toast('只有站長可以編輯');
-      else toast('無法線上刪除，請改 site/content/lessons.json 後部署');
+      else toast('無法刪除。請用站長帳號在已部署的網站上再試。');
     }
   }
 
@@ -548,10 +550,12 @@ window.RS_TEACHING = (() => {
         });
       });
     }
-    const urlInput = $('#lessonCoverUrl');
+    const urlInput = $('#lessonCoverUrlFallback');
     if (urlInput) {
       urlInput.addEventListener('input', () => {
+        const form = $('#lessonForm');
         const url = normalizeCoverUrl(urlInput.value);
+        if (form) form.cover_url.value = url || String(urlInput.value || '').trim();
         showCoverPreview(url || '');
       });
     }

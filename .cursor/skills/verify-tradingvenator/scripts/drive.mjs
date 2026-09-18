@@ -234,6 +234,7 @@ async function snapshotDom(page) {
       lessonCoverFileAccept: document.querySelector('#lessonCoverFile')?.getAttribute('accept') || '',
       lessonCoverUploadLabel: (document.querySelector('.cover-file-btn') || {}).innerText || '',
       lessonCoverUrlDetails: Boolean(document.querySelector('#lessonCoverUrlDetails')),
+      lessonDialogText: (document.querySelector('#lessonDialog') || {}).innerText || '',
       addLessonVisible: (() => {
         const el = document.querySelector('#addLessonBtn');
         if (!el) return false;
@@ -483,7 +484,9 @@ async function driveTeaching(page, outDir) {
   assert(editorShot.snap.lessonCoverFile, 'owner editor needs #lessonCoverFile');
   assert(/image\/(jpeg|png|webp)/.test(editorShot.snap.lessonCoverFileAccept || ''), 'file input should accept jpeg/png/webp');
   assert(/選擇圖片上傳/.test(editorShot.snap.lessonCoverUploadLabel || ''), 'upload should be the primary cover control');
-  assert(editorShot.snap.lessonCoverUrlDetails, 'paste-URL fallback should remain');
+  const editorText = editorShot.snap.lessonDialogText || (await page.locator('#lessonDialog').innerText());
+  assert(!/lessons\.json/.test(editorText), 'editor must not tell the owner to edit git JSON');
+  assert(!/或貼上圖片網址/.test(editorText), 'paste-URL must not be the primary cover copy');
   await page.locator('#cancelLessonBtn').click();
 
   return {

@@ -15,7 +15,7 @@
 - Choose a post (`article.post[data-lesson-id]`) to read the full text.
 - Choose **← 返回** (`#teachingBackBtn`) to go back to the list.
 - Deep link: `/#teaching` or `/#teaching/<id>` after sign-in.
-- Owner-only: **＋ 新增文章** on the list (primary **選擇圖片上傳** `#lessonCoverFile`, optional paste-URL `#lessonCoverUrl`), **編輯** / **刪除** on the detail pane, and **刪除** on list cards. Confirm in `#deleteLessonDialog`.
+- Owner-only: **＋ 新增文章** on the list, **選擇圖片上傳** (`#lessonCoverFile`) on the form, **編輯** / **刪除** on the detail pane, and **刪除** on list cards. Confirm in `#deleteLessonDialog`. Cover is a file picker on the website; do not treat git JSON or paste-URL as the owner path.
 
 ## Driving it with tv-verify
 
@@ -33,8 +33,8 @@ Preconditions:
 
 ## Gotchas
 
-- Do not look in `site/data/` for lessons; deploy overwrites that tree. Seeds live in `site/content/lessons.json`.
-- Cover is `cover_url` (https, same-origin path, or `/covers/{uuid}.jpg|png|webp` from R2). Owner upload is `POST /api/lessons/cover` (Clerk + owner). Paste-URL remains as a fallback. If R2 binding `TEACHING_COVERS` is missing, the editor shows a setup error.
+- Cover is stored as `cover_url` after `POST /api/lessons/cover` (Clerk + owner, R2). The owner picker is `#lessonCoverFile`. `#lessonCoverUrl` is a hidden field filled by upload. A collapsed 進階 details is not the product path. If R2 binding `TEACHING_COVERS` is missing, the editor shows a setup error — that is one-time infra, not how you add a lesson.
+- `site/content/lessons.json` seeds the empty-D1 list for local/static proof only. Owner day-to-day must not need to edit it. Do not look in `site/data/` for lessons.
 - Owner create/edit/delete is not available under `--bypass-auth`. Do not report a missing 新增文章 / 刪除 button as a product bug in that mode.
 - There is no video player, iframe, or embed on this view. A YouTube URL in body text (if someone pastes one later) must still render as text.
 - Hash `#teaching` is the in-app route. The document URL stays `/`.

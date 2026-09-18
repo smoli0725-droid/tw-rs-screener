@@ -121,51 +121,36 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
 - 設定資料來源（預設 `./data`）
 - 帳號方案欄位 `plan`（預設 `free`）、`plan_expires_at`（目前無收費）
 
-### 教學文章怎麼新增（僅站長）
+### 教學文章怎麼新增（僅站長，全在網站上）
 
-內容種子在 git 裡的 `site/content/lessons.json`（**不要**放 `site/data/`，那個目錄會在部署時被每日 JSON 覆寫）。
+新增、編輯、刪除、封面圖都在網站完成。不必改 git、也不必貼圖片網址。
 
-兩種寫入方式（擇一）：
+1. 用站長 Clerk 帳號登入
+2. 底部 **教學** → **＋ 新增文章**（或內頁 **編輯**）
+3. 填標題、日期、內文；封面按 **選擇圖片上傳**（jpeg / png / webp，最大 5MB）
+4. **儲存**。列表與內頁把圖放在標題上方
+5. **刪除**：列表或內頁按「刪除」→ 確認後寫入雲端
 
-1. **改檔部署（最穩）**  
-   在 `site/content/lessons.json` 的 `lessons` 陣列加一則：
+站長判定：email 在 `site/js/config.js` 的 `OWNER_EMAILS`（預設 `smoli0725@gmail.com`），或 Clerk user **Public metadata** `{ "role": "owner" }`。後端可用 Pages secret `OWNER_EMAIL` 覆寫允許的 email（逗號分隔）。
 
-   ```json
-   {
-     "id": "my-slug",
-     "title": "標題",
-     "published_at": "2026-09-18",
-     "cover_url": "https://example.com/cover.jpg",
-     "body": "純文字內文，可用換行。"
-   }
-   ```
+封面檔案會存進 Cloudflare R2。這是**一次性基礎設施**（見下），設好之後發文只走上面的網站步驟。
 
-   `cover_url` 選填，一張圖：`https://` 網址，或網站內路徑（如 `./icons/og-1200x630.png`）。提交後 Deploy Web Site 會把文章帶上線。`id` 只能是英數、點、底線、連字號。
+#### 一次性基礎設施：教學封面 R2
 
-2. **網站上編輯／刪除**  
-   用站長 Clerk 帳號登入 → 教學 →「新增文章」。封面以**選擇圖片上傳**為主（jpeg / png / webp，最大 5MB）；檔案會存進 Cloudflare R2，回傳的網址寫入 `cover_url`。也可展開「或貼上圖片網址」當備援。列表與內頁會把圖放在標題上方。  
-   若尚未綁定 R2，選檔後會顯示設定錯誤，不會寫進文章。  
-   刪除：列表或內頁按「刪除」→ 確認後寫入 D1。優先 `DELETE /api/lessons?id=`，失敗則 `PUT /api/lessons` 送剩下的文章。  
-   站長判定：email 在 `site/js/config.js` 的 `OWNER_EMAILS`（預設 `smoli0725@gmail.com`），或 Clerk user **Public metadata** `{ "role": "owner" }`。後端可用 Pages secret `OWNER_EMAIL` 覆寫允許的 email（逗號分隔）。沒有 Functions／D1 時請改用方式 1。
+讓網站上的「選擇圖片上傳」能存圖。**不是**日常發文步驟；建好後不必再碰。
 
-#### 教學封面圖上傳（Cloudflare R2，需點一次）
-
-站長在編輯器選本機圖片後，瀏覽器 `POST /api/lessons/cover`（Clerk 登入 + 站長），檔案進 R2，公開讀取路徑是 **`/covers/{uuid}.jpg|png|webp`**（不必把 bucket 設成 public）。這個路徑寫進 lesson 的 `cover_url`。非站長呼叫會 401／403。
-
-一次性設定：
-
-1. Cloudflare Dashboard → **R2 Object Storage** → **Create bucket**  
-   - Bucket name 填 **`flashpick-teaching`**  
+1. Cloudflare Dashboard → **R2 Object Storage** → **Create bucket**
+   - Bucket name 填 **`flashpick-teaching`**
    - 不必開 public access
-2. 讓 Pages 綁到這個 bucket（binding 名稱必須是 **`TEACHING_COVERS`**）：  
-   - **建議：** GitHub → Settings → Secrets → Actions，新增 `R2_TEACHING_BUCKET` = `flashpick-teaching`。之後 Deploy Web Site 會把 `wrangler.toml` 的 `[[r2_buckets]]` 帶上，並嘗試 `wrangler r2 bucket create`（bucket 已存在會略過）。  
-   - Dashboard 備援：Pages → **tradingvenator** → Settings → Bindings → R2 → Variable name `TEACHING_COVERS` → bucket `flashpick-teaching`。**仍要設 GitHub secret**，否則下次 wrangler deploy 會拿掉 toml 裡的 binding。
+2. GitHub → Settings → Secrets and variables → Actions，新增 `R2_TEACHING_BUCKET` = `flashpick-teaching`。之後 Deploy Web Site 會把 `wrangler.toml` 的 `[[r2_buckets]]` binding **`TEACHING_COVERS`** 帶上，並嘗試 `wrangler r2 bucket create`（bucket 已存在會略過）。
+   Dashboard 備援：Pages → **tradingvenator** → Settings → Bindings → R2 → Variable name `TEACHING_COVERS` → bucket `flashpick-teaching`。**仍要設 GitHub secret**，否則下次 wrangler deploy 會拿掉 toml 裡的 binding。
 3. 重新跑 **Actions → Deploy Web Site**。
-4. （可選）本機：`wrangler.toml` 已有 binding；`npx wrangler pages dev` 會用模擬 R2。
 
-Token 若要讓 Actions 自動建 bucket，需 **Account / Workers R2 Storage / Edit**。沒有這個權限就在 Dashboard 建一次即可。
+公開讀取路徑是 **`/covers/{uuid}.jpg|png|webp`**（不必把 bucket 設成 public）。非站長呼叫上傳 API 會 401／403。Token 若要讓 Actions 自動建 bucket，需 **Account / Workers R2 Storage / Edit**；沒有就在 Dashboard 建一次即可。
 
-沒綁定時，上傳 API 回 503，編輯器顯示 README 裡這段錯誤；貼網址仍可用。
+沒綁定時，網站選檔會顯示設定錯誤（API 503），發文流程仍是同一個表單。
+
+`site/content/lessons.json` 只當尚未寫入 D1 時的種子，日常發文不要改它。不要把文章放進 `site/data/`（部署會被每日 JSON 覆寫）。
 
 ### 第一次設定（Cloudflare Pages）
 
@@ -248,7 +233,7 @@ npx wrangler pages secret put CLERK_JWT_KEY --project-name=tradingvenator
 
 `CLERK_PUBLISHABLE_KEY` 由每次 deploy 寫進 wrangler `[vars]`，不必再在 Dashboard 設一次。
 
-教學封面圖：設好 `R2_TEACHING_BUCKET` 後，`wrangler.toml` 的 R2 binding 名稱是 **`TEACHING_COVERS`**、bucket 是 **`flashpick-teaching`**。步驟見上方「教學封面圖上傳」。
+教學封面圖：設好 `R2_TEACHING_BUCKET` 後，網站上的「選擇圖片上傳」才能把檔案存進 R2（binding **`TEACHING_COVERS`**、bucket **`flashpick-teaching`**）。這是一次性基礎設施，見上方「一次性基礎設施：教學封面 R2」。
 
 若之後接自訂網域，請加到：(1) Clerk allowed origins (2) `functions/_lib/cors.js` 的 production origin 或 Pages env `ALLOWED_ORIGINS`。
 
