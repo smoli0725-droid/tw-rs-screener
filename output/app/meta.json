@@ -1,17 +1,11 @@
 {
   "data_date": "2026-09-18",
-  "generated_at": "2026-09-18T17:24:47.828500+08:00",
+  "generated_at": "2026-09-19T00:37:51.897350+08:00",
   "is_fresh": true,
-  "is_trading_day": true,
-  "source_checked_at": "2026-09-18T17:24:39.068276+08:00",
-  "message": "fresh（TWSE 快照 2026-09-17 尚未更新,略過交叉比價）",
-  "twse_cross_check": {
-    "ok": true,
-    "skipped": true,
-    "reason": "twse_stale",
-    "twse_date": "2026-09-17",
-    "mismatches": []
-  },
+  "is_trading_day": false,
+  "source_checked_at": "2026-09-19T00:37:43.030644+08:00",
+  "message": "週末,沿用 2026-09-18",
+  "twse_cross_check": null,
   "price_overlay": {
     "applied": false,
     "source": null,
@@ -24,11 +18,11 @@
   },
   "counts": {
     "rs85": 291,
-    "patterns": 30,
-    "pattern_symbols": 30,
-    "near_breakout": 12,
-    "broke_out": 10,
-    "ohlcv_symbols": 75,
+    "patterns": 25,
+    "pattern_symbols": 25,
+    "near_breakout": 9,
+    "broke_out": 5,
+    "ohlcv_symbols": 70,
     "universe": 1961
   },
   "market": {
@@ -38,7 +32,7 @@
     "wins": 15,
     "losses": 16,
     "pending": 31,
-    "recovered": 5,
+    "recovered": 4,
     "win_rate": 0.484,
     "label": "市況不佳",
     "rules": {
