@@ -49,5 +49,8 @@ window.RS_API = (() => {
     getData: () => request('/api/data'),
     putData: (payload) =>
       request('/api/data', { method: 'PUT', body: JSON.stringify(payload) }),
+    getLessons: () => request('/api/lessons'),
+    putLessons: (lessons) =>
+      request('/api/lessons', { method: 'PUT', body: JSON.stringify({ lessons }) }),
   };
 })();

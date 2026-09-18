@@ -117,7 +117,7 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 20px; }
 }
 .tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 .filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.filters input, .form-card textarea, .dialog-body input, .dialog-body select {
+.filters input, .form-card textarea, .dialog-body input, .dialog-body select, .dialog-body textarea {
   width: 100%; border: 1px solid var(--line); border-radius: 12px;
   padding: 11px 12px; font: inherit; background: #fff;
 }
@@ -140,7 +140,7 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 20px; }
   position: fixed; left: 0; right: 0; bottom: 0;
   height: calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   background: rgba(255,255,255,0.95); border-top: 1px solid var(--line); z-index: 30;
 }
 .nav-item {
@@ -171,6 +171,57 @@ dialog::backdrop { background: rgba(8, 30, 36, 0.45); }
   position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
   background: #0b3d4a; color: #fff; padding: 10px 14px; border-radius: 999px;
   z-index: 99; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.2);
+}
+
+#view-teaching { max-width: 560px; }
+.teaching-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 4px;
+}
+.teaching-kicker { font-weight: 700; font-size: 1.15rem; }
+.teaching-lead { margin: 0 0 12px; }
+.teaching-back { margin: 0 0 12px; padding: 8px 14px; }
+.post-list { display: flex; flex-direction: column; gap: 8px; }
+.post {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px 16px;
+  cursor: pointer;
+  text-align: left;
+}
+.post:hover { border-color: #b7c9c4; }
+.post-title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.post-meta { color: var(--muted); font-size: 0.75rem; margin: 6px 0 8px; }
+.post-excerpt, .post-body {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  max-width: 34em;
+  white-space: pre-wrap;
+}
+.post-excerpt {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+.post-detail { cursor: default; padding: 18px 16px 20px; }
+.post-detail .post-body { margin-top: 10px; font-size: 0.98rem; line-height: 1.7; }
+.teaching-owner-actions { margin-top: 14px; }
+#lessonForm textarea {
+  width: 100%; min-height: 180px; border: 1px solid var(--line);
+  border-radius: 12px; padding: 11px 12px; font: inherit; background: #fff;
+  resize: vertical; line-height: 1.5;
 }
 
 .app-shell { display: none; }

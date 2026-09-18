@@ -15,3 +15,11 @@ CREATE TABLE IF NOT EXISTS user_data (
   updated_at TEXT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+-- Site-wide teaching posts (owner-only writes). Seed JSON in site/content/ is the fallback.
+CREATE TABLE IF NOT EXISTS site_content (
+  key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT
+);

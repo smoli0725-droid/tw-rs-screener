@@ -92,14 +92,14 @@ Stable handles:
 | Control | Handle |
 |---|---|
 | Auth gate | `#auth-gate`, `#auth-setup`, `#sign-in`, `#auth-loading` |
-| Bottom nav | `button.nav-item[data-view="portfolio\|recommend\|settings"]` (labels 持股 / 推薦 / 設定) |
+| Bottom nav | `button.nav-item[data-view="portfolio\|recommend\|teaching\|settings"]` (labels 持股 / 推薦 / 教學 / 設定) |
 | Recommend tabs | `#view-recommend button.tab[data-sub="rs85\|patterns\|breakouts"]` (RS≥85 / 型態／突破 / 交易追蹤). 市況 is **not** a tab; it is `#marketCard` on the recommend view. |
 | RS list | `#rs85List`, search `#rsSearch`, chips `[data-market]`, `#tplOnlyChip` |
 | Patterns | `#statusChips` (`data-status`), `#patternChips` (`data-pattern`), `#patternList`, `#patternCount` |
 | Trade tracking | `#tradeChips` (`data-trade`: `active\|success\|failed\|recovered`), `#tradeList`, `#tradeCount` |
 | Portfolio | `#positionList`, `#totalMv`, `#totalPnl`, `#addTradeBtn`, `#metricsBtn` |
 | Settings | `#dataBaseUrl`, `#saveSettingsBtn`, `#resetSettingsBtn`, `#dataStatusBody`, `#accountCard` |
-| Refresh | `#refreshBtn` |
+| Teaching | `#teachingList`, `#teachingDetailPane`, `#teachingBackBtn`, `#addLessonBtn` (owner-only; hidden unless Clerk owner) |
 
 First mapped proof for a new run: **recommend** (read-only). Recipe is `features/recommend.md`.
 
@@ -110,6 +110,7 @@ node .cursor/skills/verify-tradingvenator/scripts/drive.mjs --feature patterns -
 node .cursor/skills/verify-tradingvenator/scripts/drive.mjs --feature trade-tracking --bypass-auth
 node .cursor/skills/verify-tradingvenator/scripts/drive.mjs --feature portfolio --bypass-auth
 node .cursor/skills/verify-tradingvenator/scripts/drive.mjs --feature settings --bypass-auth
+node .cursor/skills/verify-tradingvenator/scripts/drive.mjs --feature teaching --bypass-auth
 ```
 
 `--bypass-auth` is harness-only: it flips `body` to `signed-in`, hides `#auth-gate`, and calls `RS_APP.start()` so bundled `./data` loads. It is **not** a Clerk session. Forbidden when `TV_VERIFY_URL` is the live Pages host.
