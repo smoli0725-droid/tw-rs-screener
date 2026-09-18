@@ -243,7 +243,7 @@ dialog::backdrop { background: rgba(8, 30, 36, 0.45); }
 .post-detail .post-title { font-size: 1.22rem; }
 .post-detail .post-meta { margin: 8px 0 0; }
 .post-cover-detail { aspect-ratio: 16 / 9; }
-.teaching-owner-actions { margin-top: 14px; }
+.teaching-owner-actions { margin: 12px 0 0; }
 #lessonForm textarea {
   width: 100%; min-height: 180px; border: 1px solid var(--line);
   border-radius: 12px; padding: 11px 12px; font: inherit; background: #fff;

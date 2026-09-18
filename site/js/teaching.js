@@ -242,8 +242,8 @@ window.RS_TEACHING = (() => {
       <div class="post-copy">
         <h2 class="post-title">${esc(lesson.title)}</h2>
         ${metaHtml(lesson)}
-        <p class="post-body">${esc(lesson.body)}</p>
         ${ownerBtns}
+        <p class="post-body">${esc(lesson.body)}</p>
       </div>
     </article>`;
     bindCoverErrors(el);
