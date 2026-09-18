@@ -32,6 +32,7 @@ jobs:
     env:
       CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
       D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+      R2_TEACHING_BUCKET: ${{ secrets.R2_TEACHING_BUCKET }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,8 +76,19 @@ jobs:
           touch site/.nojekyll
           ls -la site/data | head
 
-      - name: Inject Clerk publishable key and D1 id
+      - name: Inject Clerk publishable key, D1 id, and R2 bucket
         run: python3 scripts/inject_pages_config.py
+
+      # Token needs Account / R2 / Edit. Bucket may already exist — do not block deploy.
+      - name: Ensure R2 teaching bucket
+        if: env.R2_TEACHING_BUCKET != ''
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "3.99.0"
+          command: r2 bucket create flashpick-teaching
 
       # CI 無法互動建立專案；deploy 在專案不存在時會失敗 (8000007)
       - name: Ensure Cloudflare Pages project exists

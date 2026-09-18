@@ -13,5 +13,12 @@ binding = "DB"
 database_name = "tradingvenator"
 database_id = "00000000-0000-0000-0000-000000000000"
 
+# Teaching cover uploads. Binding TEACHING_COVERS → bucket flashpick-teaching.
+# Production deploy keeps this only when GitHub secret R2_TEACHING_BUCKET is set
+# (create the bucket once in Cloudflare; see README).
+[[r2_buckets]]
+binding = "TEACHING_COVERS"
+bucket_name = "flashpick-teaching"
+
 [vars]
 CLERK_PUBLISHABLE_KEY = "__CLERK_PUBLISHABLE_KEY__"

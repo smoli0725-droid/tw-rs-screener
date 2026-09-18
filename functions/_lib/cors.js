@@ -27,7 +27,7 @@ export function corsHeaders(request, env) {
   const origin = request.headers.get('Origin');
   const headers = {
     Vary: 'Origin',
-    'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     'Access-Control-Max-Age': '86400',
   };

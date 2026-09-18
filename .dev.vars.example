@@ -7,3 +7,5 @@ CLERK_SECRET_KEY=sk_test_REPLACE_ME
 # ALLOWED_ORIGINS=https://custom-domain.example
 # Optional. Comma-separated Clerk emails allowed to edit 教學. Default: smoli0725@gmail.com
 # OWNER_EMAIL=smoli0725@gmail.com
+# Optional. Public base for cover URLs if the R2 bucket is public (otherwise /covers/{key}).
+# COVER_PUBLIC_BASE=https://pub-xxxxxxxx.r2.dev

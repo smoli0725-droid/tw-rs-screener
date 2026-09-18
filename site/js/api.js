@@ -21,7 +21,14 @@ window.RS_API = (() => {
       },
       opts.headers || {}
     );
-    if (opts.body != null && !headers['Content-Type'] && !headers['content-type']) {
+    const isForm =
+      typeof FormData !== 'undefined' && opts.body instanceof FormData;
+    if (
+      opts.body != null &&
+      !isForm &&
+      !headers['Content-Type'] &&
+      !headers['content-type']
+    ) {
       headers['Content-Type'] = 'application/json';
     }
     const res = await fetch(`${base()}${path}`, Object.assign({}, opts, { headers }));
@@ -52,5 +59,12 @@ window.RS_API = (() => {
     getLessons: () => request('/api/lessons'),
     putLessons: (lessons) =>
       request('/api/lessons', { method: 'PUT', body: JSON.stringify({ lessons }) }),
+    deleteLesson: (id) =>
+      request(`/api/lessons?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    uploadLessonCover: (file) => {
+      const body = new FormData();
+      body.append('file', file);
+      return request('/api/lessons/cover', { method: 'POST', body });
+    },
   };
 })();

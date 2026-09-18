@@ -2,6 +2,7 @@ window.RS_TEACHING = (() => {
   const SEED_URL = './content/lessons.json';
   const MAX_TITLE = 80;
   const MAX_BODY = 8000;
+  const MAX_COVER_URL = 500;
 
   const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -10,6 +11,8 @@ window.RS_TEACHING = (() => {
   let selectedId = null;
   let bound = false;
   let pendingDeleteId = null;
+  let coverUpload = null;
+  const MAX_COVER_BYTES = 5 * 1024 * 1024;
 
   function esc(s) {
     return String(s ?? '')
@@ -25,6 +28,26 @@ window.RS_TEACHING = (() => {
     return `${t.slice(0, max).replace(/\s+\S*$/, '')}…`;
   }
 
+  function normalizeCoverUrl(raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s) return '';
+    if (s.length > MAX_COVER_URL) return '';
+    if (/[\s<>"'`\\]/.test(s)) return '';
+    if (s.startsWith('./') || (s.startsWith('/') && !s.startsWith('//'))) {
+      if (s.includes('..') || s.includes('//')) return '';
+      if (!/^(\.\/|\/)[A-Za-z0-9._~/-]+$/.test(s)) return '';
+      return s;
+    }
+    try {
+      const u = new URL(s);
+      if (u.protocol !== 'https:') return '';
+      if (u.username || u.password) return '';
+      return u.href;
+    } catch {
+      return '';
+    }
+  }
+
   function normalizeLesson(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const id = String(raw.id || '').trim();
@@ -32,7 +55,8 @@ window.RS_TEACHING = (() => {
     const body = String(raw.body || raw.passage || '').trim();
     if (!id || !title || !body) return null;
     const published = String(raw.published_at || raw.date || '').slice(0, 10);
-    return { id, title, body, published_at: published };
+    const cover_url = normalizeCoverUrl(raw.cover_url || raw.image);
+    return { id, title, body, published_at: published, cover_url };
   }
 
   function normalizeList(raw) {
@@ -166,6 +190,16 @@ window.RS_TEACHING = (() => {
     bar.hidden = !owner;
   }
 
+  function coverHtml(lesson, extraClass = '') {
+    if (!lesson.cover_url) return '';
+    const cls = extraClass ? `post-cover ${extraClass}` : 'post-cover';
+    return `<img class="${cls}" src="${esc(lesson.cover_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`;
+  }
+
+  function metaHtml(lesson) {
+    return `<div class="post-meta">${esc(lesson.published_at || '')}${lesson.published_at ? ' · ' : ''}閃電選股</div>`;
+  }
+
   function renderList() {
     renderOwnerBar();
     const el = $('#teachingList');
@@ -174,33 +208,56 @@ window.RS_TEACHING = (() => {
       el.innerHTML = '<div class="empty">尚無教學文章</div>';
       return;
     }
+    const owner = isOwner();
     el.innerHTML = lessons
-      .map(
-        (lesson) => `<article class="post" data-lesson-id="${esc(lesson.id)}" role="button" tabindex="0">
-        <h2 class="post-title">${esc(lesson.title)}</h2>
-        <div class="post-meta">${esc(lesson.published_at || '')}${lesson.published_at ? ' · ' : ''}閃電選股</div>
-        <p class="post-excerpt">${esc(excerpt(lesson.body))}</p>
-      </article>`
-      )
+      .map((lesson) => {
+        const cover = coverHtml(lesson);
+        const del = owner
+          ? `<button type="button" class="ghost-btn post-delete" data-delete-lesson="${esc(lesson.id)}">刪除</button>`
+          : '';
+        return `<article class="post${cover ? ' has-cover' : ''}" data-lesson-id="${esc(lesson.id)}" role="button" tabindex="0">
+        ${cover}
+        <div class="post-copy">
+          <h2 class="post-title">${esc(lesson.title)}</h2>
+          <p class="post-excerpt">${esc(excerpt(lesson.body))}</p>
+          <div class="post-foot">${metaHtml(lesson)}${del}</div>
+        </div>
+      </article>`;
+      })
       .join('');
+    bindCoverErrors(el);
   }
 
   function renderDetail(lesson) {
     renderOwnerBar();
     const el = $('#teachingDetail');
     if (!el) return;
+    const cover = coverHtml(lesson, 'post-cover-detail');
     const ownerBtns = isOwner()
       ? `<div class="item-actions teaching-owner-actions">
           <button type="button" class="ghost-btn" data-edit-lesson="${esc(lesson.id)}">編輯</button>
           <button type="button" class="ghost-btn" data-delete-lesson="${esc(lesson.id)}">刪除</button>
         </div>`
       : '';
-    el.innerHTML = `<article class="post post-detail">
-      <h2 class="post-title">${esc(lesson.title)}</h2>
-      <div class="post-meta">${esc(lesson.published_at || '')}${lesson.published_at ? ' · ' : ''}閃電選股</div>
-      <p class="post-body">${esc(lesson.body)}</p>
-      ${ownerBtns}
+    el.innerHTML = `<article class="post post-detail${cover ? ' has-cover' : ''}">
+      ${cover}
+      <div class="post-copy">
+        <h2 class="post-title">${esc(lesson.title)}</h2>
+        ${metaHtml(lesson)}
+        ${ownerBtns}
+        <p class="post-body">${esc(lesson.body)}</p>
+      </div>
     </article>`;
+    bindCoverErrors(el);
+  }
+
+  function bindCoverErrors(root) {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    root.querySelectorAll('img.post-cover').forEach((img) => {
+      img.addEventListener('error', () => {
+        img.hidden = true;
+      });
+    });
   }
 
   function render() {
@@ -212,6 +269,94 @@ window.RS_TEACHING = (() => {
     return `p-${Date.now().toString(36)}`;
   }
 
+  function setCoverStatus(msg, isError) {
+    const el = $('#lessonCoverStatus');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.classList.toggle('cover-status-error', Boolean(isError));
+  }
+
+  function showCoverPreview(url) {
+    const img = $('#lessonCoverPreview');
+    if (!img) return;
+    if (!url) {
+      img.removeAttribute('src');
+      img.hidden = true;
+      return;
+    }
+    img.src = url;
+    img.hidden = false;
+  }
+
+  async function uploadCoverFile(file) {
+    if (!isOwner()) {
+      setCoverStatus('只有站長可以上傳', true);
+      toast('只有站長可以上傳');
+      return null;
+    }
+    if (!file) return null;
+    const type = String(file.type || '').toLowerCase();
+    if (type && type !== 'image/jpeg' && type !== 'image/jpg' && type !== 'image/png' && type !== 'image/webp') {
+      setCoverStatus('請選 jpeg、png 或 webp（最大 5MB）', true);
+      return null;
+    }
+    if (file.size > MAX_COVER_BYTES) {
+      setCoverStatus('圖片請小於 5MB', true);
+      return null;
+    }
+    if (!window.RS_API || typeof window.RS_API.uploadLessonCover !== 'function') {
+      setCoverStatus('無法上傳封面。請用已部署的網站、站長帳號登入後再試。', true);
+      return null;
+    }
+    let localUrl = '';
+    try {
+      localUrl = URL.createObjectURL(file);
+      showCoverPreview(localUrl);
+    } catch {
+      localUrl = '';
+    }
+    setCoverStatus('上傳中…');
+    try {
+      const payload = await window.RS_API.uploadLessonCover(file);
+      const url = payload && (payload.url || payload.cover_url);
+      const cover_url = normalizeCoverUrl(url);
+      if (!cover_url) {
+        setCoverStatus('上傳成功但網址無效', true);
+        return null;
+      }
+      const form = $('#lessonForm');
+      if (form) form.cover_url.value = cover_url;
+      showCoverPreview(cover_url);
+      setCoverStatus('已上傳封面');
+      return cover_url;
+    } catch (err) {
+      console.error(err);
+      let msg = '上傳失敗';
+      if (err && err.status === 403) msg = '只有站長可以上傳';
+      else if (err && err.status === 401) msg = '請先登入站長帳號';
+      else if (err && err.status === 413) msg = '圖片請小於 5MB';
+      else if (err && err.status === 415) msg = '請選 jpeg、png 或 webp';
+      else if (err && err.status === 503) {
+        msg =
+          (err.body && err.body.error) ||
+          '尚未設定封面儲存空間（Cloudflare R2：bucket flashpick-teaching，binding TEACHING_COVERS）。步驟見 README。';
+      } else if (err && err.message) msg = err.message;
+      setCoverStatus(msg, true);
+      toast(msg);
+      const form = $('#lessonForm');
+      showCoverPreview(form && form.cover_url.value ? form.cover_url.value : '');
+      return null;
+    } finally {
+      if (localUrl) {
+        try {
+          URL.revokeObjectURL(localUrl);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
   function openEditor(lesson) {
     const dialog = $('#lessonDialog');
     const form = $('#lessonForm');
@@ -221,7 +366,17 @@ window.RS_TEACHING = (() => {
     form.id.value = lesson ? lesson.id : '';
     form.title.value = lesson ? lesson.title : '';
     form.body.value = lesson ? lesson.body : '';
+    const existing = lesson && lesson.cover_url ? lesson.cover_url : '';
+    form.cover_url.value = existing;
     form.published_at.value = lesson && lesson.published_at ? lesson.published_at : new Date().toISOString().slice(0, 10);
+    const fileInput = $('#lessonCoverFile');
+    if (fileInput) fileInput.value = '';
+    const fallback = $('#lessonCoverUrlFallback');
+    if (fallback) fallback.value = '';
+    setCoverStatus('');
+    showCoverPreview(existing);
+    const details = $('#lessonCoverUrlDetails');
+    if (details) details.open = false;
     dialog.showModal();
   }
 
@@ -230,18 +385,22 @@ window.RS_TEACHING = (() => {
     if (dialog && dialog.open) dialog.close();
   }
 
+  function applySaved(payload, fallback) {
+    if (payload && Array.isArray(payload.lessons)) {
+      lessons = normalizeList(payload.lessons);
+    } else {
+      lessons = fallback;
+    }
+    source = 'd1';
+    sortLessons();
+  }
+
   async function persist(next) {
     if (!window.RS_API || typeof window.RS_API.putLessons !== 'function') {
       throw new Error('no-api');
     }
     const payload = await window.RS_API.putLessons(next);
-    if (payload && Array.isArray(payload.lessons)) {
-      lessons = normalizeList(payload.lessons);
-    } else {
-      lessons = next;
-    }
-    source = 'd1';
-    sortLessons();
+    applySaved(payload, next);
   }
 
   async function saveFromForm(form) {
@@ -249,9 +408,18 @@ window.RS_TEACHING = (() => {
       toast('只有站長可以編輯');
       return;
     }
+    if (coverUpload) {
+      await coverUpload;
+    }
     const title = String(form.title.value || '').trim();
     const body = String(form.body.value || '').trim();
     const published_at = String(form.published_at.value || '').slice(0, 10);
+    const coverInput = String(form.cover_url.value || '').trim();
+    const cover_url = normalizeCoverUrl(coverInput);
+    if (coverInput && !cover_url) {
+      toast('請重新選擇圖片上傳');
+      return;
+    }
     if (!title || !body) {
       toast('請填寫標題與內文');
       return;
@@ -262,7 +430,7 @@ window.RS_TEACHING = (() => {
     }
     const id = String(form.id.value || '').trim() || newId();
     const next = lessons.filter((row) => row.id !== id);
-    next.push({ id, title, body, published_at });
+    next.push({ id, title, body, published_at, cover_url });
     try {
       await persist(next);
       closeEditor();
@@ -271,11 +439,12 @@ window.RS_TEACHING = (() => {
     } catch (err) {
       console.error(err);
       if (err && err.status === 403) toast('只有站長可以編輯');
-      else toast('無法線上儲存，請改 site/content/lessons.json 後部署');
+      else toast('無法儲存。請用站長帳號在已部署的網站上再試。');
     }
   }
 
   function openDelete(id) {
+    if (!isOwner()) return;
     const lesson = lessons.find((row) => row.id === id);
     if (!lesson) return;
     pendingDeleteId = id;
@@ -285,15 +454,29 @@ window.RS_TEACHING = (() => {
     if (dialog) dialog.showModal();
   }
 
+  async function removeLesson(id) {
+    const next = lessons.filter((row) => row.id !== id);
+    if (window.RS_API && typeof window.RS_API.deleteLesson === 'function') {
+      try {
+        const payload = await window.RS_API.deleteLesson(id);
+        applySaved(payload, next);
+        return;
+      } catch (err) {
+        if (err && (err.status === 403 || err.status === 401)) throw err;
+      }
+    }
+    await persist(next);
+  }
+
   async function confirmDelete() {
     if (!pendingDeleteId) return;
     if (!isOwner()) {
       toast('只有站長可以編輯');
       return;
     }
-    const next = lessons.filter((row) => row.id !== pendingDeleteId);
+    const id = pendingDeleteId;
     try {
-      await persist(next);
+      await removeLesson(id);
       pendingDeleteId = null;
       const dialog = $('#deleteLessonDialog');
       if (dialog && dialog.open) dialog.close();
@@ -302,7 +485,7 @@ window.RS_TEACHING = (() => {
     } catch (err) {
       console.error(err);
       if (err && err.status === 403) toast('只有站長可以編輯');
-      else toast('無法線上刪除，請改 site/content/lessons.json 後部署');
+      else toast('無法刪除。請用站長帳號在已部署的網站上再試。');
     }
   }
 
@@ -312,12 +495,20 @@ window.RS_TEACHING = (() => {
     const list = $('#teachingList');
     if (list) {
       list.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('[data-delete-lesson]');
+        if (delBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          openDelete(delBtn.dataset.deleteLesson);
+          return;
+        }
         const post = e.target.closest('[data-lesson-id]');
         if (!post) return;
         openDetail(post.dataset.lessonId);
       });
       list.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
+        if (e.target.closest('[data-delete-lesson]')) return;
         const post = e.target.closest('[data-lesson-id]');
         if (!post) return;
         e.preventDefault();
@@ -348,6 +539,26 @@ window.RS_TEACHING = (() => {
         saveFromForm(form);
       });
     }
+    const fileInput = $('#lessonCoverFile');
+    if (fileInput) {
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        coverUpload = uploadCoverFile(file).finally(() => {
+          coverUpload = null;
+          fileInput.value = '';
+        });
+      });
+    }
+    const urlInput = $('#lessonCoverUrlFallback');
+    if (urlInput) {
+      urlInput.addEventListener('input', () => {
+        const form = $('#lessonForm');
+        const url = normalizeCoverUrl(urlInput.value);
+        if (form) form.cover_url.value = url || String(urlInput.value || '').trim();
+        showCoverPreview(url || '');
+      });
+    }
     const cancel = $('#cancelLessonBtn');
     if (cancel) cancel.addEventListener('click', () => closeEditor());
     const cancelDel = $('#cancelDeleteLessonBtn');
@@ -373,6 +584,8 @@ window.RS_TEACHING = (() => {
     excerpt,
     normalizeLesson,
     normalizeList,
+    normalizeCoverUrl,
+    uploadCoverFile,
     isOwner,
     getLessons: () => lessons.slice(),
     getSource: () => source,

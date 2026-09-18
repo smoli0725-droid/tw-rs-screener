@@ -256,8 +256,20 @@
       <input type="hidden" name="id" />
       <label>標題<input name="title" required maxlength="80" placeholder="一句話標題" /></label>
       <label>日期<input name="published_at" type="date" required /></label>
+      <div class="cover-picker">
+        <span class="cover-picker-label">封面圖</span>
+        <label class="cover-file-btn" for="lessonCoverFile">選擇圖片上傳</label>
+        <input id="lessonCoverFile" name="cover_file" type="file" accept="image/jpeg,image/png,image/webp" />
+        <input type="hidden" id="lessonCoverUrl" name="cover_url" maxlength="500" />
+        <img id="lessonCoverPreview" class="cover-preview" alt="" hidden />
+        <p id="lessonCoverStatus" class="hint"></p>
+        <details id="lessonCoverUrlDetails" class="cover-advanced">
+          <summary>進階</summary>
+          <label>圖片網址<input id="lessonCoverUrlFallback" maxlength="500" placeholder="https://…" /></label>
+        </details>
+      </div>
       <label>內文<textarea name="body" rows="10" required maxlength="8000" placeholder="純文字，短句分行較好讀"></textarea></label>
-      <p class="hint">純文字，沒有影片。線上儲存僅站長帳號。離線請編輯 <code>site/content/lessons.json</code> 後部署。</p>
+      <p class="hint">封面選填：按「選擇圖片上傳」（jpeg / png / webp，最大 5MB）。圖會顯示在標題上方。純文字，沒有影片。</p>
       <div class="dialog-actions">
         <button type="button" class="ghost-btn" id="cancelLessonBtn">取消</button>
         <button type="submit" class="primary-btn">儲存</button>

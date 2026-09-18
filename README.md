@@ -117,33 +117,40 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
 - **整站需登入**（Clerk：Email magic link + Google）。未登入只看得到登入畫面，看不到 RS／型態／持股
 - 持股與設定同步到雲端（D1）；本機 localStorage 只當快取。第一次登入會把既有 localStorage 上傳
 - RS≥85 總表、型態／即將突破、K 線
-- **教學**（底部導航「教學」，網址 `#teaching`）：X 風格短文列表，點進去看全文。純文字，沒有影片。一般登入使用者只能讀；只有站長能新增／編輯
+- **教學**（底部導航「教學」，網址 `#teaching`）：X 風格短文列表（封面圖在標題上方），點進去看全文。純文字＋選填一張圖，沒有影片。一般登入使用者只能讀；只有站長能新增／編輯／刪除
 - 設定資料來源（預設 `./data`）
 - 帳號方案欄位 `plan`（預設 `free`）、`plan_expires_at`（目前無收費）
 
-### 教學文章怎麼新增（僅站長）
+### 教學文章怎麼新增（僅站長，全在網站上）
 
-內容種子在 git 裡的 `site/content/lessons.json`（**不要**放 `site/data/`，那個目錄會在部署時被每日 JSON 覆寫）。
+新增、編輯、刪除、封面圖都在網站完成。不必改 git、也不必貼圖片網址。
 
-兩種寫入方式（擇一）：
+1. 用站長 Clerk 帳號登入
+2. 底部 **教學** → **＋ 新增文章**（或內頁 **編輯**）
+3. 填標題、日期、內文；封面按 **選擇圖片上傳**（jpeg / png / webp，最大 5MB）
+4. **儲存**。列表與內頁把圖放在標題上方
+5. **刪除**：列表或內頁按「刪除」→ 確認後寫入雲端
 
-1. **改檔部署（最穩）**  
-   在 `site/content/lessons.json` 的 `lessons` 陣列加一則：
+站長判定：email 在 `site/js/config.js` 的 `OWNER_EMAILS`（預設 `smoli0725@gmail.com`），或 Clerk user **Public metadata** `{ "role": "owner" }`。後端可用 Pages secret `OWNER_EMAIL` 覆寫允許的 email（逗號分隔）。
 
-   ```json
-   {
-     "id": "my-slug",
-     "title": "標題",
-     "published_at": "2026-09-18",
-     "body": "純文字內文，可用換行。"
-   }
-   ```
+封面檔案會存進 Cloudflare R2。這是**一次性基礎設施**（見下），設好之後發文只走上面的網站步驟。
 
-   提交後 Deploy Web Site 會把文章帶上線。`id` 只能是英數、點、底線、連字號。
+#### 一次性基礎設施：教學封面 R2
 
-2. **網站上編輯**  
-   用站長 Clerk 帳號登入 → 教學 →「新增文章」。  
-   站長判定：email 在 `site/js/config.js` 的 `OWNER_EMAILS`（預設 `smoli0725@gmail.com`），或 Clerk user **Public metadata** `{ "role": "owner" }`。後端可用 Pages secret `OWNER_EMAIL` 覆寫允許的 email（逗號分隔）。線上儲存走 `PUT /api/lessons`（D1 `site_content`）；沒有 Functions／D1 時請改用方式 1。
+讓網站上的「選擇圖片上傳」能存圖。**不是**日常發文步驟；建好後不必再碰。
+
+1. Cloudflare Dashboard → **R2 Object Storage** → **Create bucket**
+   - Bucket name 填 **`flashpick-teaching`**
+   - 不必開 public access
+2. GitHub → Settings → Secrets and variables → Actions，新增 `R2_TEACHING_BUCKET` = `flashpick-teaching`。之後 Deploy Web Site 會把 `wrangler.toml` 的 `[[r2_buckets]]` binding **`TEACHING_COVERS`** 帶上，並嘗試 `wrangler r2 bucket create`（bucket 已存在會略過）。
+   Dashboard 備援：Pages → **tradingvenator** → Settings → Bindings → R2 → Variable name `TEACHING_COVERS` → bucket `flashpick-teaching`。**仍要設 GitHub secret**，否則下次 wrangler deploy 會拿掉 toml 裡的 binding。
+3. 重新跑 **Actions → Deploy Web Site**。
+
+公開讀取路徑是 **`/covers/{uuid}.jpg|png|webp`**（不必把 bucket 設成 public）。非站長呼叫上傳 API 會 401／403。Token 若要讓 Actions 自動建 bucket，需 **Account / Workers R2 Storage / Edit**；沒有就在 Dashboard 建一次即可。
+
+沒綁定時，網站選檔會顯示設定錯誤（API 503），發文流程仍是同一個表單。
+
+`site/content/lessons.json` 只當尚未寫入 D1 時的種子，日常發文不要改它。不要把文章放進 `site/data/`（部署會被每日 JSON 覆寫）。
 
 ### 第一次設定（Cloudflare Pages）
 
@@ -202,7 +209,7 @@ npx wrangler d1 create tradingvenator
 npx wrangler d1 execute tradingvenator --remote --file=migrations/0001_init.sql
 ```
 
-`wrangler.toml` 的 `[[d1_databases]]` binding 名稱是 **`DB`**。Deploy workflow 會用 GitHub secret `D1_DATABASE_ID` 取代 placeholder；沒設這個 secret 時仍會部署網站，但 `/api/*` 沒有資料庫。
+`wrangler.toml` 的 `[[d1_databases]]` binding 名稱是 **`DB`**。Deploy workflow 會用 GitHub secret `D1_DATABASE_ID` 取代 placeholder；沒設這個 secret 時仍會部署網站，但 `/api/*` 沒有資料庫。教學封面 R2 同理：沒設 `R2_TEACHING_BUCKET` 時仍部署，但上傳封面會 503。
 
 #### 3) GitHub + Pages secrets
 
@@ -214,6 +221,7 @@ GitHub → **Settings → Secrets and variables → Actions**：
 | `CLERK_SECRET_KEY` | **不要**進前端。放到 Cloudflare Pages secret（見下） |
 | `CLERK_JWT_KEY` | 可選，PEM 公鑰 |
 | `D1_DATABASE_ID` | `wrangler d1 create` 得到的 UUID |
+| `R2_TEACHING_BUCKET` | 教學封面 R2。設成 `flashpick-teaching` 後 deploy 才會綁 `TEACHING_COVERS` |
 
 Cloudflare → Pages → **tradingvenator** → Settings → Environment variables（Production **and** Preview）：
 
@@ -224,6 +232,8 @@ npx wrangler pages secret put CLERK_JWT_KEY --project-name=tradingvenator
 ```
 
 `CLERK_PUBLISHABLE_KEY` 由每次 deploy 寫進 wrangler `[vars]`，不必再在 Dashboard 設一次。
+
+教學封面圖：設好 `R2_TEACHING_BUCKET` 後，網站上的「選擇圖片上傳」才能把檔案存進 R2（binding **`TEACHING_COVERS`**、bucket **`flashpick-teaching`**）。這是一次性基礎設施，見上方「一次性基礎設施：教學封面 R2」。
 
 若之後接自訂網域，請加到：(1) Clerk allowed origins (2) `functions/_lib/cors.js` 的 production origin 或 Pages env `ALLOWED_ORIGINS`。
 
@@ -263,7 +273,8 @@ cd site && python3 -m http.server 8080
 ### 架構摘要
 
 - Frontend：`site/js/auth.js` 載入 `@clerk/clerk-js` CDN；`storage.js` 登入後拉雲端、變更時 PUT
-- Backend：Cloudflare Pages Functions（`functions/api/me.js`、`functions/api/data.js`）用 `@clerk/backend` `authenticateRequest`
+- Backend：Cloudflare Pages Functions（`functions/api/me.js`、`functions/api/data.js`、`functions/api/lessons/index.js`、`functions/api/lessons/cover.js`）用 `@clerk/backend` `authenticateRequest`
+- 教學封面：R2 binding `TEACHING_COVERS`；公開讀 `GET /covers/:key`（不需登入）；上傳 `POST /api/lessons/cover`（僅站長）
 - CORS 只允許 `https://tradingvenator.pages.dev` 與 localhost
 - 每日 RS Python pipeline（`rs_calculator.py` / `daily_rs.yml`）與 Flutter App **沒有**改動
 
