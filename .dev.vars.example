@@ -5,3 +5,5 @@ CLERK_SECRET_KEY=sk_test_REPLACE_ME
 # CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
 # Optional extra CORS origins, comma-separated
 # ALLOWED_ORIGINS=https://custom-domain.example
+# Optional. Comma-separated Clerk emails allowed to edit 教學. Default: smoli0725@gmail.com
+# OWNER_EMAIL=smoli0725@gmail.com

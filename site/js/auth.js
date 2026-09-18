@@ -238,6 +238,32 @@ window.RS_AUTH = (() => {
     }
   }
 
+  function ownerEmails() {
+    const cfg = window.RS_CONFIG && window.RS_CONFIG.OWNER_EMAILS;
+    const list = Array.isArray(cfg)
+      ? cfg
+      : String(cfg || '')
+          .split(',')
+          .map((s) => s.trim());
+    return list.map((s) => String(s).toLowerCase().trim()).filter(Boolean);
+  }
+
+  function isOwner() {
+    const user = clerk && clerk.user;
+    if (!user) return false;
+    const meta = user.publicMetadata || {};
+    const role = String(meta.role || meta.Role || '').toLowerCase();
+    if (role === 'owner' || meta.admin === true || meta.isOwner === true) return true;
+    const emails = [];
+    const primary = user.primaryEmailAddress && user.primaryEmailAddress.emailAddress;
+    if (primary) emails.push(primary);
+    for (const item of user.emailAddresses || []) {
+      if (item && item.emailAddress) emails.push(item.emailAddress);
+    }
+    const allowed = new Set(ownerEmails());
+    return emails.some((email) => allowed.has(String(email).toLowerCase()));
+  }
+
   return {
     start,
     get clerk() {
@@ -249,6 +275,7 @@ window.RS_AUTH = (() => {
     isSignedIn() {
       return Boolean(clerk && (clerk.isSignedIn || clerk.user));
     },
+    isOwner,
   };
 })();
 

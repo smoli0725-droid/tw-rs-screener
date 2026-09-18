@@ -25,6 +25,7 @@ const FEATURES = [
   'trade-tracking',
   'portfolio',
   'settings',
+  'teaching',
 ];
 
 function parseArgs(argv) {
@@ -202,6 +203,22 @@ async function snapshotDom(page) {
       dataBaseUrl: document.querySelector('#dataBaseUrl')?.value || null,
       dataStatusBody: pack('#dataStatusBody'),
       accountBody: pack('#accountBody'),
+      teachingList: pack('#teachingList'),
+      teachingListPane: pack('#teachingListPane'),
+      teachingDetailPane: pack('#teachingDetailPane'),
+      teachingDetail: pack('#teachingDetail'),
+      teachingPosts: [...document.querySelectorAll('#teachingList article.post')].slice(0, 8).map((el) => ({
+        id: el.getAttribute('data-lesson-id') || '',
+        title: (el.querySelector('.post-title') || {}).innerText || '',
+        excerpt: (el.querySelector('.post-excerpt') || {}).innerText || '',
+      })),
+      teachingOwnerBarHidden: (() => {
+        const el = document.querySelector('#teachingOwnerBar');
+        if (!el) return true;
+        return el.hidden || getComputedStyle(el).display === 'none';
+      })(),
+      teachingBody: (document.querySelector('#teachingDetail .post-body') || {}).innerText || '',
+      teachingTitle: (document.querySelector('#teachingDetail .post-title') || {}).innerText || '',
     };
   });
 }
@@ -404,6 +421,37 @@ async function driveSettings(page, outDir) {
   };
 }
 
+async function driveTeaching(page, outDir) {
+  await clickNav(page, 'teaching');
+  await page.locator('#teachingList').waitFor({ state: 'visible' });
+  const listShot = await saveEvidence(outDir, '01-list', page);
+  assert(listShot.snap.activeNav === 'teaching', 'nav 教學 should be active');
+  const posts = listShot.snap.teachingPosts || [];
+  assert(posts.length > 0, 'teaching list should have seeded posts');
+  const titles = posts.map((p) => p.title).join('\n');
+  assert(!/Course\s*\d|課程\s*\d/.test(titles), `posts should not be numbered like Course 1: ${titles}`);
+  assert(posts[0].excerpt && posts[0].excerpt.length > 10, 'list should show a passage excerpt');
+  assert(listShot.snap.teachingOwnerBarHidden, 'owner composer should stay hidden without a Clerk owner session');
+  await page.locator('#teachingList article.post').first().click();
+  await page.locator('#teachingDetailPane').waitFor({ state: 'visible' });
+  const detailShot = await saveEvidence(outDir, '02-detail', page);
+  const body = detailShot.snap.teachingBody || '';
+  assert(body.length > (posts[0].excerpt || '').length, 'detail should show the full passage, not only the excerpt');
+  assert(/返回/.test(await page.locator('#teachingBackBtn').innerText()), 'detail needs 返回');
+  await page.locator('#teachingBackBtn').click();
+  await page.locator('#teachingListPane').waitFor({ state: 'visible' });
+  const backShot = await saveEvidence(outDir, '03-back', page);
+  assert(!backShot.snap.teachingListPane?.hidden, 'list should be visible after 返回');
+  return {
+    ok: true,
+    feature: 'teaching',
+    posts: posts.slice(0, 3),
+    detail_title: detailShot.snap.teachingTitle,
+    proof: ['01-list.png', '02-detail.png', '03-back.png'],
+    note: 'Owner create/edit is hidden under --bypass-auth (no Clerk user).',
+  };
+}
+
 const DRIVERS = {
   'auth-gate': driveAuthGate,
   recommend: driveRecommend,
@@ -411,6 +459,7 @@ const DRIVERS = {
   'trade-tracking': driveTrades,
   portfolio: drivePortfolio,
   settings: driveSettings,
+  teaching: driveTeaching,
 };
 
 export async function classifyAuth(opts) {

@@ -47,3 +47,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Pattern / breakout list](./patterns.md) covers 型態／突破 status chips and the pattern list.
 - [Portfolio holdings](./portfolio.md) covers the 持股 tab read-only (empty or existing rows).
 - [Settings data URL](./settings.md) covers 設定, `#dataBaseUrl`, and refresh.
+- [Teaching (教學)](./teaching.md) covers the 教學 feed, full-passage detail, and owner-only composer hidden for readers.

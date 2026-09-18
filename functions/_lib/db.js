@@ -70,3 +70,34 @@ export async function putUserData(db, userId, trades, settings) {
     .run();
   return ts;
 }
+
+export async function getSiteContent(db, key) {
+  const row = await db
+    .prepare(
+      `SELECT value_json, updated_at, updated_by FROM site_content WHERE key = ?`
+    )
+    .bind(key)
+    .first();
+  if (!row) return null;
+  return {
+    value: parseJson(row.value_json, null),
+    updated_at: row.updated_at || null,
+    updated_by: row.updated_by || null,
+  };
+}
+
+export async function putSiteContent(db, key, value, userId) {
+  const ts = nowIso();
+  await db
+    .prepare(
+      `INSERT INTO site_content (key, value_json, updated_at, updated_by)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET
+         value_json = excluded.value_json,
+         updated_at = excluded.updated_at,
+         updated_by = excluded.updated_by`
+    )
+    .bind(key, JSON.stringify(value), ts, userId || null)
+    .run();
+  return ts;
+}

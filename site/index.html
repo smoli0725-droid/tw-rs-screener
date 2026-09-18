@@ -132,6 +132,23 @@
       </div>
     </section>
 
+    <section id="view-teaching" class="view">
+      <div id="teachingListPane">
+        <div class="teaching-head">
+          <div class="teaching-kicker">教學</div>
+          <div id="teachingOwnerBar" hidden>
+            <button id="addLessonBtn" class="ghost-btn" type="button">＋ 新增文章</button>
+          </div>
+        </div>
+        <p class="hint teaching-lead">短文筆記，點進去看全文。</p>
+        <div id="teachingList" class="post-list"></div>
+      </div>
+      <div id="teachingDetailPane" hidden>
+        <button id="teachingBackBtn" class="ghost-btn teaching-back" type="button">← 返回</button>
+        <div id="teachingDetail"></div>
+      </div>
+    </section>
+
     <section id="view-settings" class="view">
       <div class="card" id="aboutCard">
         <h3>關於</h3>
@@ -169,6 +186,7 @@
   <nav class="bottom-nav">
     <button class="nav-item active" data-view="portfolio" type="button"><span class="nav-icon">▣</span>持股</button>
     <button class="nav-item" data-view="recommend" type="button"><span class="nav-icon">◈</span>推薦</button>
+    <button class="nav-item" data-view="teaching" type="button"><span class="nav-icon">✎</span>教學</button>
     <button class="nav-item" data-view="settings" type="button"><span class="nav-icon">⚙</span>設定</button>
   </nav>
 
@@ -232,6 +250,32 @@
     </div>
   </dialog>
 
+  <dialog id="lessonDialog">
+    <form method="dialog" id="lessonForm" class="dialog-body">
+      <h2 id="lessonDialogTitle">新增文章</h2>
+      <input type="hidden" name="id" />
+      <label>標題<input name="title" required maxlength="80" placeholder="一句話標題" /></label>
+      <label>日期<input name="published_at" type="date" required /></label>
+      <label>內文<textarea name="body" rows="10" required maxlength="8000" placeholder="純文字，短句分行較好讀"></textarea></label>
+      <p class="hint">純文字，沒有影片。線上儲存僅站長帳號。離線請編輯 <code>site/content/lessons.json</code> 後部署。</p>
+      <div class="dialog-actions">
+        <button type="button" class="ghost-btn" id="cancelLessonBtn">取消</button>
+        <button type="submit" class="primary-btn">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="deleteLessonDialog">
+    <div class="dialog-body">
+      <h2>刪除文章</h2>
+      <p id="deleteLessonHint"></p>
+      <div class="dialog-actions">
+        <button id="cancelDeleteLessonBtn" class="ghost-btn" type="button">取消</button>
+        <button id="confirmDeleteLessonBtn" class="primary-btn" type="button">確認刪除</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="chartDialog" class="chart-dialog">
     <div class="dialog-body chart-body">
       <div class="chart-head">
@@ -255,6 +299,7 @@
   <script src="js/data.js"></script>
   <script src="js/portfolio.js"></script>
   <script src="js/chart.js"></script>
+  <script src="js/teaching.js"></script>
   <script src="js/app.js"></script>
   <script src="js/auth.js"></script>
 </body>

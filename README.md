@@ -117,8 +117,33 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
 - **整站需登入**（Clerk：Email magic link + Google）。未登入只看得到登入畫面，看不到 RS／型態／持股
 - 持股與設定同步到雲端（D1）；本機 localStorage 只當快取。第一次登入會把既有 localStorage 上傳
 - RS≥85 總表、型態／即將突破、K 線
+- **教學**（底部導航「教學」，網址 `#teaching`）：X 風格短文列表，點進去看全文。純文字，沒有影片。一般登入使用者只能讀；只有站長能新增／編輯
 - 設定資料來源（預設 `./data`）
 - 帳號方案欄位 `plan`（預設 `free`）、`plan_expires_at`（目前無收費）
+
+### 教學文章怎麼新增（僅站長）
+
+內容種子在 git 裡的 `site/content/lessons.json`（**不要**放 `site/data/`，那個目錄會在部署時被每日 JSON 覆寫）。
+
+兩種寫入方式（擇一）：
+
+1. **改檔部署（最穩）**  
+   在 `site/content/lessons.json` 的 `lessons` 陣列加一則：
+
+   ```json
+   {
+     "id": "my-slug",
+     "title": "標題",
+     "published_at": "2026-09-18",
+     "body": "純文字內文，可用換行。"
+   }
+   ```
+
+   提交後 Deploy Web Site 會把文章帶上線。`id` 只能是英數、點、底線、連字號。
+
+2. **網站上編輯**  
+   用站長 Clerk 帳號登入 → 教學 →「新增文章」。  
+   站長判定：email 在 `site/js/config.js` 的 `OWNER_EMAILS`（預設 `smoli0725@gmail.com`），或 Clerk user **Public metadata** `{ "role": "owner" }`。後端可用 Pages secret `OWNER_EMAIL` 覆寫允許的 email（逗號分隔）。線上儲存走 `PUT /api/lessons`（D1 `site_content`）；沒有 Functions／D1 時請改用方式 1。
 
 ### 第一次設定（Cloudflare Pages）
 

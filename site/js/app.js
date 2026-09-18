@@ -353,12 +353,26 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
   }
 
   // navigation
+  function showView(view, opts = {}) {
+    $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+    $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
+    if (view === 'teaching' && window.RS_TEACHING) {
+      if (opts.hash) RS_TEACHING.openFromHash(opts.hash);
+      else RS_TEACHING.onViewShown();
+      return;
+    }
+    if (typeof location !== 'undefined' && String(location.hash || '').startsWith('#teaching')) {
+      history.replaceState(null, '', `${location.pathname}${location.search}`);
+    }
+  }
+
+  function teachingHash() {
+    return String(location.hash || '').replace(/^#/, '').startsWith('teaching');
+  }
+
   $$('.nav-item').forEach((btn) => {
     btn.addEventListener('click', () => {
-      $$('.nav-item').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      $$('.view').forEach((v) => v.classList.remove('active'));
-      $(`#view-${btn.dataset.view}`).classList.add('active');
+      showView(btn.dataset.view);
     });
   });
   $$('#view-recommend .tab').forEach((tab) => {
@@ -673,17 +687,29 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
       <p class="hint">持股與設定會同步到雲端；billing 尚未開放，方案預設為 free。</p>`;
   }
 
+  window.addEventListener('hashchange', () => {
+    if (!teachingHash()) return;
+    showView('teaching', { hash: location.hash });
+  });
+
   window.RS_APP = {
     start: async () => {
       const input = $('#dataBaseUrl');
       if (input) input.value = RS_STORAGE.getDataBaseUrl();
       renderAccount();
+      if (window.RS_TEACHING) {
+        RS_TEACHING.bind();
+        await RS_TEACHING.load();
+        RS_TEACHING.render();
+      }
       await refresh();
       renderAccount();
+      if (teachingHash()) showView('teaching', { hash: location.hash });
     },
     refresh,
     renderPortfolio,
     renderAccount,
     toast,
+    showView,
   };
 })();
