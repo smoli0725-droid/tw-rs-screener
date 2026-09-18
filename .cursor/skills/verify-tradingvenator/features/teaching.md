@@ -15,7 +15,7 @@
 - Choose a post (`article.post[data-lesson-id]`) to read the full text.
 - Choose **← 返回** (`#teachingBackBtn`) to go back to the list.
 - Deep link: `/#teaching` or `/#teaching/<id>` after sign-in.
-- Owner-only: **＋ 新增文章** on the list (cover URL field `#lessonCoverUrl`), **編輯** / **刪除** on the detail pane, and **刪除** on list cards. Confirm in `#deleteLessonDialog`.
+- Owner-only: **＋ 新增文章** on the list (primary **選擇圖片上傳** `#lessonCoverFile`, optional paste-URL `#lessonCoverUrl`), **編輯** / **刪除** on the detail pane, and **刪除** on list cards. Confirm in `#deleteLessonDialog`.
 
 ## Driving it with tv-verify
 
@@ -29,12 +29,12 @@ Preconditions:
 - **Read the list.** `#teachingList` contains `article.post` rows. A seeded row has `img.post-cover` **above** `.post-title`, then `.post-excerpt`. The title is not `Course 1` / `課程 1`. `#addLessonBtn` is not visible (`#teachingOwnerBar` is `hidden`). List cards have no 刪除.
 - **Open a post.** Choose the first `article.post`. `#teachingDetailPane` is visible, `#teachingListPane` is hidden, `#teachingDetail img.post-cover` is present, and `#teachingDetail .post-body` contains more of the passage than the excerpt. `#teachingBackBtn` is visible. No owner 刪除.
 - **Return.** Choose **← 返回**. `#teachingListPane` is visible again.
-- **Proof.** `artifacts/teaching/01-list.png` shows 教學 in the bottom nav and at least one post with cover above title + excerpt. `artifacts/teaching/02-detail.png` shows the cover, full passage, and 返回. `result.json` `ok: true`.
+- **Proof.** `artifacts/teaching/01-list.png` shows 教學 in the bottom nav and at least one post with cover above title + excerpt. `artifacts/teaching/02-detail.png` shows the cover, full passage, and 返回. Local `--bypass-auth` then mocks `RS_AUTH.isOwner` to open the editor (`04-owner-editor.png`) with **選擇圖片上傳**. `result.json` `ok: true`.
 
 ## Gotchas
 
 - Do not look in `site/data/` for lessons; deploy overwrites that tree. Seeds live in `site/content/lessons.json`.
-- Cover is `cover_url` (https or same-origin path). There is no R2 upload; the owner pastes a URL.
+- Cover is `cover_url` (https, same-origin path, or `/covers/{uuid}.jpg|png|webp` from R2). Owner upload is `POST /api/lessons/cover` (Clerk + owner). Paste-URL remains as a fallback. If R2 binding `TEACHING_COVERS` is missing, the editor shows a setup error.
 - Owner create/edit/delete is not available under `--bypass-auth`. Do not report a missing 新增文章 / 刪除 button as a product bug in that mode.
 - There is no video player, iframe, or embed on this view. A YouTube URL in body text (if someone pastes one later) must still render as text.
 - Hash `#teaching` is the in-app route. The document URL stays `/`.

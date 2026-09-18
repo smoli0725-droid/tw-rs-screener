@@ -11,6 +11,8 @@ window.RS_TEACHING = (() => {
   let selectedId = null;
   let bound = false;
   let pendingDeleteId = null;
+  let coverUpload = null;
+  const MAX_COVER_BYTES = 5 * 1024 * 1024;
 
   function esc(s) {
     return String(s ?? '')
@@ -267,6 +269,94 @@ window.RS_TEACHING = (() => {
     return `p-${Date.now().toString(36)}`;
   }
 
+  function setCoverStatus(msg, isError) {
+    const el = $('#lessonCoverStatus');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.classList.toggle('cover-status-error', Boolean(isError));
+  }
+
+  function showCoverPreview(url) {
+    const img = $('#lessonCoverPreview');
+    if (!img) return;
+    if (!url) {
+      img.removeAttribute('src');
+      img.hidden = true;
+      return;
+    }
+    img.src = url;
+    img.hidden = false;
+  }
+
+  async function uploadCoverFile(file) {
+    if (!isOwner()) {
+      setCoverStatus('只有站長可以上傳', true);
+      toast('只有站長可以上傳');
+      return null;
+    }
+    if (!file) return null;
+    const type = String(file.type || '').toLowerCase();
+    if (type && type !== 'image/jpeg' && type !== 'image/jpg' && type !== 'image/png' && type !== 'image/webp') {
+      setCoverStatus('請選 jpeg、png 或 webp（最大 5MB）', true);
+      return null;
+    }
+    if (file.size > MAX_COVER_BYTES) {
+      setCoverStatus('圖片請小於 5MB', true);
+      return null;
+    }
+    if (!window.RS_API || typeof window.RS_API.uploadLessonCover !== 'function') {
+      setCoverStatus('無法上傳：沒有 API。可貼網址，或看 README 設定 R2。', true);
+      return null;
+    }
+    let localUrl = '';
+    try {
+      localUrl = URL.createObjectURL(file);
+      showCoverPreview(localUrl);
+    } catch {
+      localUrl = '';
+    }
+    setCoverStatus('上傳中…');
+    try {
+      const payload = await window.RS_API.uploadLessonCover(file);
+      const url = payload && (payload.url || payload.cover_url);
+      const cover_url = normalizeCoverUrl(url);
+      if (!cover_url) {
+        setCoverStatus('上傳成功但網址無效', true);
+        return null;
+      }
+      const form = $('#lessonForm');
+      if (form) form.cover_url.value = cover_url;
+      showCoverPreview(cover_url);
+      setCoverStatus('已上傳封面');
+      return cover_url;
+    } catch (err) {
+      console.error(err);
+      let msg = '上傳失敗';
+      if (err && err.status === 403) msg = '只有站長可以上傳';
+      else if (err && err.status === 401) msg = '請先登入站長帳號';
+      else if (err && err.status === 413) msg = '圖片請小於 5MB';
+      else if (err && err.status === 415) msg = '請選 jpeg、png 或 webp';
+      else if (err && err.status === 503) {
+        msg =
+          (err.body && err.body.error) ||
+          '尚未設定封面儲存空間（Cloudflare R2：bucket flashpick-teaching，binding TEACHING_COVERS）。步驟見 README。';
+      } else if (err && err.message) msg = err.message;
+      setCoverStatus(msg, true);
+      toast(msg);
+      const form = $('#lessonForm');
+      showCoverPreview(form && form.cover_url.value ? form.cover_url.value : '');
+      return null;
+    } finally {
+      if (localUrl) {
+        try {
+          URL.revokeObjectURL(localUrl);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
   function openEditor(lesson) {
     const dialog = $('#lessonDialog');
     const form = $('#lessonForm');
@@ -276,8 +366,15 @@ window.RS_TEACHING = (() => {
     form.id.value = lesson ? lesson.id : '';
     form.title.value = lesson ? lesson.title : '';
     form.body.value = lesson ? lesson.body : '';
-    form.cover_url.value = lesson && lesson.cover_url ? lesson.cover_url : '';
+    const existing = lesson && lesson.cover_url ? lesson.cover_url : '';
+    form.cover_url.value = existing;
     form.published_at.value = lesson && lesson.published_at ? lesson.published_at : new Date().toISOString().slice(0, 10);
+    const fileInput = $('#lessonCoverFile');
+    if (fileInput) fileInput.value = '';
+    setCoverStatus('');
+    showCoverPreview(existing);
+    const details = $('#lessonCoverUrlDetails');
+    if (details) details.open = Boolean(existing && !existing.startsWith('/covers/'));
     dialog.showModal();
   }
 
@@ -309,13 +406,16 @@ window.RS_TEACHING = (() => {
       toast('只有站長可以編輯');
       return;
     }
+    if (coverUpload) {
+      await coverUpload;
+    }
     const title = String(form.title.value || '').trim();
     const body = String(form.body.value || '').trim();
     const published_at = String(form.published_at.value || '').slice(0, 10);
     const coverInput = String(form.cover_url.value || '').trim();
     const cover_url = normalizeCoverUrl(coverInput);
     if (coverInput && !cover_url) {
-      toast('封面請貼 https 圖片網址，或網站內路徑');
+      toast('封面請上傳圖片，或貼 https 圖片網址／網站內路徑');
       return;
     }
     if (!title || !body) {
@@ -437,6 +537,24 @@ window.RS_TEACHING = (() => {
         saveFromForm(form);
       });
     }
+    const fileInput = $('#lessonCoverFile');
+    if (fileInput) {
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        coverUpload = uploadCoverFile(file).finally(() => {
+          coverUpload = null;
+          fileInput.value = '';
+        });
+      });
+    }
+    const urlInput = $('#lessonCoverUrl');
+    if (urlInput) {
+      urlInput.addEventListener('input', () => {
+        const url = normalizeCoverUrl(urlInput.value);
+        showCoverPreview(url || '');
+      });
+    }
     const cancel = $('#cancelLessonBtn');
     if (cancel) cancel.addEventListener('click', () => closeEditor());
     const cancelDel = $('#cancelDeleteLessonBtn');
@@ -463,6 +581,7 @@ window.RS_TEACHING = (() => {
     normalizeLesson,
     normalizeList,
     normalizeCoverUrl,
+    uploadCoverFile,
     isOwner,
     getLessons: () => lessons.slice(),
     getSource: () => source,

@@ -4,13 +4,15 @@ import test from 'node:test';
 import { corsHeaders } from '../functions/_lib/cors.js';
 import { normalizeCoverUrl, normalizeLesson, normalizeList } from '../functions/_lib/lessons.js';
 
-test('CORS allows GET PUT DELETE for lessons writes', () => {
+test('CORS allows GET POST PUT DELETE for lessons writes', () => {
   const req = new Request('https://tradingvenator.pages.dev/api/lessons', {
     headers: { Origin: 'https://tradingvenator.pages.dev' },
+    method: 'OPTIONS',
   });
   const headers = corsHeaders(req, {});
   assert.match(headers['Access-Control-Allow-Methods'], /DELETE/);
   assert.match(headers['Access-Control-Allow-Methods'], /PUT/);
+  assert.match(headers['Access-Control-Allow-Methods'], /POST/);
 });
 
 test('API normalizeLesson round-trips cover_url and aliases image', () => {
@@ -23,6 +25,10 @@ test('API normalizeLesson round-trips cover_url and aliases image', () => {
   });
   assert.equal(lesson.cover_url, 'https://tradingvenator.pages.dev/icons/og-1200x630.png');
   assert.equal(normalizeCoverUrl('javascript:alert(1)'), '');
+  assert.equal(
+    normalizeCoverUrl('/covers/11111111-1111-1111-1111-111111111111.webp'),
+    '/covers/11111111-1111-1111-1111-111111111111.webp'
+  );
   assert.equal(normalizeLesson({ id: 'bad id', title: 't', body: 'b' }), null);
 });
 

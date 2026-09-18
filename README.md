@@ -143,9 +143,29 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
    `cover_url` 選填，一張圖：`https://` 網址，或網站內路徑（如 `./icons/og-1200x630.png`）。提交後 Deploy Web Site 會把文章帶上線。`id` 只能是英數、點、底線、連字號。
 
 2. **網站上編輯／刪除**  
-   用站長 Clerk 帳號登入 → 教學 →「新增文章」。表單可貼封面圖網址（沒有上傳空間；把圖放到可公開 https 或 `site/icons` 後貼路徑）。列表與內頁會把圖放在標題上方。  
+   用站長 Clerk 帳號登入 → 教學 →「新增文章」。封面以**選擇圖片上傳**為主（jpeg / png / webp，最大 5MB）；檔案會存進 Cloudflare R2，回傳的網址寫入 `cover_url`。也可展開「或貼上圖片網址」當備援。列表與內頁會把圖放在標題上方。  
+   若尚未綁定 R2，選檔後會顯示設定錯誤，不會寫進文章。  
    刪除：列表或內頁按「刪除」→ 確認後寫入 D1。優先 `DELETE /api/lessons?id=`，失敗則 `PUT /api/lessons` 送剩下的文章。  
    站長判定：email 在 `site/js/config.js` 的 `OWNER_EMAILS`（預設 `smoli0725@gmail.com`），或 Clerk user **Public metadata** `{ "role": "owner" }`。後端可用 Pages secret `OWNER_EMAIL` 覆寫允許的 email（逗號分隔）。沒有 Functions／D1 時請改用方式 1。
+
+#### 教學封面圖上傳（Cloudflare R2，需點一次）
+
+站長在編輯器選本機圖片後，瀏覽器 `POST /api/lessons/cover`（Clerk 登入 + 站長），檔案進 R2，公開讀取路徑是 **`/covers/{uuid}.jpg|png|webp`**（不必把 bucket 設成 public）。這個路徑寫進 lesson 的 `cover_url`。非站長呼叫會 401／403。
+
+一次性設定：
+
+1. Cloudflare Dashboard → **R2 Object Storage** → **Create bucket**  
+   - Bucket name 填 **`flashpick-teaching`**  
+   - 不必開 public access
+2. 讓 Pages 綁到這個 bucket（binding 名稱必須是 **`TEACHING_COVERS`**）：  
+   - **建議：** GitHub → Settings → Secrets → Actions，新增 `R2_TEACHING_BUCKET` = `flashpick-teaching`。之後 Deploy Web Site 會把 `wrangler.toml` 的 `[[r2_buckets]]` 帶上，並嘗試 `wrangler r2 bucket create`（bucket 已存在會略過）。  
+   - Dashboard 備援：Pages → **tradingvenator** → Settings → Bindings → R2 → Variable name `TEACHING_COVERS` → bucket `flashpick-teaching`。**仍要設 GitHub secret**，否則下次 wrangler deploy 會拿掉 toml 裡的 binding。
+3. 重新跑 **Actions → Deploy Web Site**。
+4. （可選）本機：`wrangler.toml` 已有 binding；`npx wrangler pages dev` 會用模擬 R2。
+
+Token 若要讓 Actions 自動建 bucket，需 **Account / Workers R2 Storage / Edit**。沒有這個權限就在 Dashboard 建一次即可。
+
+沒綁定時，上傳 API 回 503，編輯器顯示 README 裡這段錯誤；貼網址仍可用。
 
 ### 第一次設定（Cloudflare Pages）
 
@@ -204,7 +224,7 @@ npx wrangler d1 create tradingvenator
 npx wrangler d1 execute tradingvenator --remote --file=migrations/0001_init.sql
 ```
 
-`wrangler.toml` 的 `[[d1_databases]]` binding 名稱是 **`DB`**。Deploy workflow 會用 GitHub secret `D1_DATABASE_ID` 取代 placeholder；沒設這個 secret 時仍會部署網站，但 `/api/*` 沒有資料庫。
+`wrangler.toml` 的 `[[d1_databases]]` binding 名稱是 **`DB`**。Deploy workflow 會用 GitHub secret `D1_DATABASE_ID` 取代 placeholder；沒設這個 secret 時仍會部署網站，但 `/api/*` 沒有資料庫。教學封面 R2 同理：沒設 `R2_TEACHING_BUCKET` 時仍部署，但上傳封面會 503。
 
 #### 3) GitHub + Pages secrets
 
@@ -216,6 +236,7 @@ GitHub → **Settings → Secrets and variables → Actions**：
 | `CLERK_SECRET_KEY` | **不要**進前端。放到 Cloudflare Pages secret（見下） |
 | `CLERK_JWT_KEY` | 可選，PEM 公鑰 |
 | `D1_DATABASE_ID` | `wrangler d1 create` 得到的 UUID |
+| `R2_TEACHING_BUCKET` | 教學封面 R2。設成 `flashpick-teaching` 後 deploy 才會綁 `TEACHING_COVERS` |
 
 Cloudflare → Pages → **tradingvenator** → Settings → Environment variables（Production **and** Preview）：
 
@@ -226,6 +247,8 @@ npx wrangler pages secret put CLERK_JWT_KEY --project-name=tradingvenator
 ```
 
 `CLERK_PUBLISHABLE_KEY` 由每次 deploy 寫進 wrangler `[vars]`，不必再在 Dashboard 設一次。
+
+教學封面圖：設好 `R2_TEACHING_BUCKET` 後，`wrangler.toml` 的 R2 binding 名稱是 **`TEACHING_COVERS`**、bucket 是 **`flashpick-teaching`**。步驟見上方「教學封面圖上傳」。
 
 若之後接自訂網域，請加到：(1) Clerk allowed origins (2) `functions/_lib/cors.js` 的 production origin 或 Pages env `ALLOWED_ORIGINS`。
 
@@ -265,7 +288,8 @@ cd site && python3 -m http.server 8080
 ### 架構摘要
 
 - Frontend：`site/js/auth.js` 載入 `@clerk/clerk-js` CDN；`storage.js` 登入後拉雲端、變更時 PUT
-- Backend：Cloudflare Pages Functions（`functions/api/me.js`、`functions/api/data.js`）用 `@clerk/backend` `authenticateRequest`
+- Backend：Cloudflare Pages Functions（`functions/api/me.js`、`functions/api/data.js`、`functions/api/lessons/index.js`、`functions/api/lessons/cover.js`）用 `@clerk/backend` `authenticateRequest`
+- 教學封面：R2 binding `TEACHING_COVERS`；公開讀 `GET /covers/:key`（不需登入）；上傳 `POST /api/lessons/cover`（僅站長）
 - CORS 只允許 `https://tradingvenator.pages.dev` 與 localhost
 - 每日 RS Python pipeline（`rs_calculator.py` / `daily_rs.yml`）與 Flutter App **沒有**改動
 

@@ -230,6 +230,16 @@ async function snapshotDom(page) {
       teachingTitle: (document.querySelector('#teachingDetail .post-title') || {}).innerText || '',
       teachingDetailCover: Boolean(document.querySelector('#teachingDetail img.post-cover')),
       teachingDetailDelete: Boolean(document.querySelector('#teachingDetail [data-delete-lesson]')),
+      lessonCoverFile: Boolean(document.querySelector('#lessonCoverFile')),
+      lessonCoverFileAccept: document.querySelector('#lessonCoverFile')?.getAttribute('accept') || '',
+      lessonCoverUploadLabel: (document.querySelector('.cover-file-btn') || {}).innerText || '',
+      lessonCoverUrlDetails: Boolean(document.querySelector('#lessonCoverUrlDetails')),
+      addLessonVisible: (() => {
+        const el = document.querySelector('#addLessonBtn');
+        if (!el) return false;
+        const cs = getComputedStyle(el);
+        return !el.hidden && cs.display !== 'none' && cs.visibility !== 'hidden';
+      })(),
     };
   });
 }
@@ -458,13 +468,31 @@ async function driveTeaching(page, outDir) {
   await page.locator('#teachingListPane').waitFor({ state: 'visible' });
   const backShot = await saveEvidence(outDir, '03-back', page);
   assert(!backShot.snap.teachingListPane?.hidden, 'list should be visible after 返回');
+
+  await page.evaluate(() => {
+    window.RS_AUTH = window.RS_AUTH || {};
+    window.RS_AUTH.isOwner = () => true;
+    if (window.RS_TEACHING && typeof window.RS_TEACHING.render === 'function') {
+      window.RS_TEACHING.render();
+    }
+  });
+  await page.locator('#addLessonBtn').waitFor({ state: 'visible' });
+  await page.locator('#addLessonBtn').click();
+  await page.locator('#lessonDialog').waitFor({ state: 'visible' });
+  const editorShot = await saveEvidence(outDir, '04-owner-editor', page);
+  assert(editorShot.snap.lessonCoverFile, 'owner editor needs #lessonCoverFile');
+  assert(/image\/(jpeg|png|webp)/.test(editorShot.snap.lessonCoverFileAccept || ''), 'file input should accept jpeg/png/webp');
+  assert(/選擇圖片上傳/.test(editorShot.snap.lessonCoverUploadLabel || ''), 'upload should be the primary cover control');
+  assert(editorShot.snap.lessonCoverUrlDetails, 'paste-URL fallback should remain');
+  await page.locator('#cancelLessonBtn').click();
+
   return {
     ok: true,
     feature: 'teaching',
     posts: posts.slice(0, 3),
     detail_title: detailShot.snap.teachingTitle,
-    proof: ['01-list.png', '02-detail.png', '03-back.png'],
-    note: 'Owner create/edit/delete is hidden under --bypass-auth (no Clerk user).',
+    proof: ['01-list.png', '02-detail.png', '03-back.png', '04-owner-editor.png'],
+    note: 'Owner bar is hidden under --bypass-auth until the harness mocks RS_AUTH.isOwner to open the editor (not a Clerk session). Live upload still needs R2 TEACHING_COVERS.',
   };
 }
 

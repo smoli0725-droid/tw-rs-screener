@@ -61,11 +61,15 @@ test('teaching helpers excerpt and normalize text-only posts plus cover_url', ()
   assert.equal(T.normalizeLesson({ id: 'x', title: 't' }), null);
 });
 
-test('cover_url accepts https and same-origin paths, rejects javascript', () => {
+test('cover_url accepts https, same-origin paths, and /covers keys; rejects javascript', () => {
   const T = loadTeaching();
   assert.equal(T.normalizeCoverUrl('https://tradingvenator.pages.dev/icons/og-1200x630.png'), 'https://tradingvenator.pages.dev/icons/og-1200x630.png');
   assert.equal(T.normalizeCoverUrl('./icons/og-1200x630.png'), './icons/og-1200x630.png');
   assert.equal(T.normalizeCoverUrl('/icons/og-1200x630.png'), '/icons/og-1200x630.png');
+  assert.equal(
+    T.normalizeCoverUrl('/covers/11111111-1111-1111-1111-111111111111.webp'),
+    '/covers/11111111-1111-1111-1111-111111111111.webp'
+  );
   assert.equal(T.normalizeCoverUrl('http://evil.example/x.png'), '');
   assert.equal(T.normalizeCoverUrl('javascript:alert(1)'), '');
   assert.equal(T.normalizeCoverUrl('data:image/png;base64,aaaa'), '');
@@ -79,15 +83,19 @@ test('cover_url accepts https and same-origin paths, rejects javascript', () => 
   assert.equal(dropped.cover_url, '');
 });
 
-test('site nav includes 教學, cover field, delete dialog, not a public composer', () => {
+test('site nav includes 教學, cover upload, delete dialog, not a public composer', () => {
   assert.match(INDEX, /data-view="teaching"/);
   assert.match(INDEX, />教學</);
   assert.match(INDEX, /id="view-teaching"/);
   assert.match(INDEX, /id="teachingList"/);
   assert.match(INDEX, /id="teachingDetailPane"/);
   assert.match(INDEX, /id="addLessonBtn"/);
+  assert.match(INDEX, /id="lessonCoverFile"/);
+  assert.match(INDEX, /type="file"/);
+  assert.match(INDEX, /選擇圖片上傳/);
   assert.match(INDEX, /id="lessonCoverUrl"/);
   assert.match(INDEX, /name="cover_url"/);
+  assert.match(INDEX, /id="lessonCoverUrlDetails"/);
   assert.match(INDEX, /id="deleteLessonDialog"/);
   assert.match(INDEX, /id="confirmDeleteLessonBtn"/);
   assert.match(INDEX, /js\/teaching\.js/);
@@ -96,9 +104,13 @@ test('site nav includes 教學, cover field, delete dialog, not a public compose
   assert.match(APP_JS, /showView/);
   assert.match(APP_JS, /RS_TEACHING/);
   assert.match(API_JS, /deleteLesson/);
+  assert.match(API_JS, /uploadLessonCover/);
   assert.match(API_JS, /method: 'DELETE'/);
   assert.match(STYLES, /grid-template-columns: repeat\(4, 1fr\)/);
   assert.match(STYLES, /\.post-excerpt/);
   assert.match(STYLES, /\.post-cover/);
   assert.match(STYLES, /\.post-title/);
+  assert.match(STYLES, /\.cover-file-btn/);
+  assert.match(TEACHING_JS, /uploadLessonCover/);
+  assert.match(TEACHING_JS, /尚未設定封面儲存空間/);
 });

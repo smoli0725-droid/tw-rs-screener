@@ -1,40 +1,10 @@
-import { json } from '../_lib/cors.js';
-import { getSiteContent, putSiteContent } from '../_lib/db.js';
-import { normalizeList } from '../_lib/lessons.js';
-import { isSiteOwner } from '../_lib/owner.js';
-import { createClerkClient } from '@clerk/backend';
+import { json } from '../../_lib/cors.js';
+import { getSiteContent, putSiteContent } from '../../_lib/db.js';
+import { normalizeList } from '../../_lib/lessons.js';
+import { requireOwner } from '../../_lib/require_owner.js';
 
 const MAX_BODY_BYTES = 256 * 1024;
 const SEED_PATH = '/content/lessons.json';
-
-function jwtKeyFromEnv(env) {
-  const raw = env.CLERK_JWT_KEY;
-  if (!raw || !String(raw).trim()) return undefined;
-  return String(raw).replace(/\\n/g, '\n');
-}
-
-async function loadOwnerUser(env, userId) {
-  const clerk = createClerkClient({
-    secretKey: env.CLERK_SECRET_KEY,
-    publishableKey: env.CLERK_PUBLISHABLE_KEY,
-    jwtKey: jwtKeyFromEnv(env),
-  });
-  return clerk.users.getUser(userId);
-}
-
-async function requireOwner(env, data, request) {
-  let user;
-  try {
-    user = await loadOwnerUser(env, data.userId);
-  } catch (err) {
-    console.error('Clerk getUser failed', err);
-    return { error: json({ error: 'Forbidden' }, 403, request, env) };
-  }
-  if (!isSiteOwner(user, env)) {
-    return { error: json({ error: 'Forbidden' }, 403, request, env) };
-  }
-  return { user };
-}
 
 async function fetchSeedLessons(request) {
   try {
