@@ -99,7 +99,7 @@ Stable handles:
 | Trade tracking | `#tradeChips` (`data-trade`: `active\|success\|failed\|recovered`), `#tradeList`, `#tradeCount` |
 | Portfolio | `#positionList`, `#totalMv`, `#totalPnl`, `#addTradeBtn`, `#metricsBtn` |
 | Settings | `#dataBaseUrl`, `#saveSettingsBtn`, `#resetSettingsBtn`, `#dataStatusBody`, `#accountCard` |
-| Teaching | `#teachingList`, `#teachingDetailPane`, `#teachingBackBtn`, `#addLessonBtn` (owner-only; hidden unless Clerk owner) |
+| Teaching | `#teachingList`, `#teachingDetailPane`, `#teachingBackBtn`, `#addLessonBtn` / `[data-delete-lesson]` (owner-only; hidden unless Clerk owner), `#lessonCoverUrl` |
 
 First mapped proof for a new run: **recommend** (read-only). Recipe is `features/recommend.md`.
 

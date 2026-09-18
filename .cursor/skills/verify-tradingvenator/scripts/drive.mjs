@@ -211,6 +211,15 @@ async function snapshotDom(page) {
         id: el.getAttribute('data-lesson-id') || '',
         title: (el.querySelector('.post-title') || {}).innerText || '',
         excerpt: (el.querySelector('.post-excerpt') || {}).innerText || '',
+        hasCover: Boolean(el.querySelector('img.post-cover')),
+        coverBeforeTitle: (() => {
+          const kids = [...el.children];
+          const img = kids.findIndex((n) => n.matches && n.matches('img.post-cover'));
+          const titleWrap = el.querySelector('.post-title');
+          if (img < 0 || !titleWrap) return false;
+          return img === 0 && el.contains(titleWrap);
+        })(),
+        hasDelete: Boolean(el.querySelector('[data-delete-lesson]')),
       })),
       teachingOwnerBarHidden: (() => {
         const el = document.querySelector('#teachingOwnerBar');
@@ -219,6 +228,8 @@ async function snapshotDom(page) {
       })(),
       teachingBody: (document.querySelector('#teachingDetail .post-body') || {}).innerText || '',
       teachingTitle: (document.querySelector('#teachingDetail .post-title') || {}).innerText || '',
+      teachingDetailCover: Boolean(document.querySelector('#teachingDetail img.post-cover')),
+      teachingDetailDelete: Boolean(document.querySelector('#teachingDetail [data-delete-lesson]')),
     };
   });
 }
@@ -431,12 +442,17 @@ async function driveTeaching(page, outDir) {
   const titles = posts.map((p) => p.title).join('\n');
   assert(!/Course\s*\d|課程\s*\d/.test(titles), `posts should not be numbered like Course 1: ${titles}`);
   assert(posts[0].excerpt && posts[0].excerpt.length > 10, 'list should show a passage excerpt');
+  assert(posts.some((p) => p.hasCover), 'list should show a cover image on at least one post');
+  assert(posts.some((p) => p.coverBeforeTitle), 'cover image should sit above the title');
+  assert(posts.every((p) => !p.hasDelete), 'non-owner must not see list delete');
   assert(listShot.snap.teachingOwnerBarHidden, 'owner composer should stay hidden without a Clerk owner session');
   await page.locator('#teachingList article.post').first().click();
   await page.locator('#teachingDetailPane').waitFor({ state: 'visible' });
   const detailShot = await saveEvidence(outDir, '02-detail', page);
   const body = detailShot.snap.teachingBody || '';
   assert(body.length > (posts[0].excerpt || '').length, 'detail should show the full passage, not only the excerpt');
+  assert(detailShot.snap.teachingDetailCover, 'detail should show the cover image');
+  assert(!detailShot.snap.teachingDetailDelete, 'non-owner must not see detail delete');
   assert(/返回/.test(await page.locator('#teachingBackBtn').innerText()), 'detail needs 返回');
   await page.locator('#teachingBackBtn').click();
   await page.locator('#teachingListPane').waitFor({ state: 'visible' });
@@ -448,7 +464,7 @@ async function driveTeaching(page, outDir) {
     posts: posts.slice(0, 3),
     detail_title: detailShot.snap.teachingTitle,
     proof: ['01-list.png', '02-detail.png', '03-back.png'],
-    note: 'Owner create/edit is hidden under --bypass-auth (no Clerk user).',
+    note: 'Owner create/edit/delete is hidden under --bypass-auth (no Clerk user).',
   };
 }
 

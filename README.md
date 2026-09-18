@@ -117,7 +117,7 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
 - **整站需登入**（Clerk：Email magic link + Google）。未登入只看得到登入畫面，看不到 RS／型態／持股
 - 持股與設定同步到雲端（D1）；本機 localStorage 只當快取。第一次登入會把既有 localStorage 上傳
 - RS≥85 總表、型態／即將突破、K 線
-- **教學**（底部導航「教學」，網址 `#teaching`）：X 風格短文列表，點進去看全文。純文字，沒有影片。一般登入使用者只能讀；只有站長能新增／編輯
+- **教學**（底部導航「教學」，網址 `#teaching`）：X 風格短文列表（封面圖在標題上方），點進去看全文。純文字＋選填一張圖，沒有影片。一般登入使用者只能讀；只有站長能新增／編輯／刪除
 - 設定資料來源（預設 `./data`）
 - 帳號方案欄位 `plan`（預設 `free`）、`plan_expires_at`（目前無收費）
 
@@ -135,15 +135,17 @@ Private repo 也能用（不必把 GitHub 改成 Public）。
      "id": "my-slug",
      "title": "標題",
      "published_at": "2026-09-18",
+     "cover_url": "https://example.com/cover.jpg",
      "body": "純文字內文，可用換行。"
    }
    ```
 
-   提交後 Deploy Web Site 會把文章帶上線。`id` 只能是英數、點、底線、連字號。
+   `cover_url` 選填，一張圖：`https://` 網址，或網站內路徑（如 `./icons/og-1200x630.png`）。提交後 Deploy Web Site 會把文章帶上線。`id` 只能是英數、點、底線、連字號。
 
-2. **網站上編輯**  
-   用站長 Clerk 帳號登入 → 教學 →「新增文章」。  
-   站長判定：email 在 `site/js/config.js` 的 `OWNER_EMAILS`（預設 `smoli0725@gmail.com`），或 Clerk user **Public metadata** `{ "role": "owner" }`。後端可用 Pages secret `OWNER_EMAIL` 覆寫允許的 email（逗號分隔）。線上儲存走 `PUT /api/lessons`（D1 `site_content`）；沒有 Functions／D1 時請改用方式 1。
+2. **網站上編輯／刪除**  
+   用站長 Clerk 帳號登入 → 教學 →「新增文章」。表單可貼封面圖網址（沒有上傳空間；把圖放到可公開 https 或 `site/icons` 後貼路徑）。列表與內頁會把圖放在標題上方。  
+   刪除：列表或內頁按「刪除」→ 確認後寫入 D1。優先 `DELETE /api/lessons?id=`，失敗則 `PUT /api/lessons` 送剩下的文章。  
+   站長判定：email 在 `site/js/config.js` 的 `OWNER_EMAILS`（預設 `smoli0725@gmail.com`），或 Clerk user **Public metadata** `{ "role": "owner" }`。後端可用 Pages secret `OWNER_EMAIL` 覆寫允許的 email（逗號分隔）。沒有 Functions／D1 時請改用方式 1。
 
 ### 第一次設定（Cloudflare Pages）
 

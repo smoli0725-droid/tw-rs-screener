@@ -256,8 +256,9 @@
       <input type="hidden" name="id" />
       <label>標題<input name="title" required maxlength="80" placeholder="一句話標題" /></label>
       <label>日期<input name="published_at" type="date" required /></label>
+      <label>封面圖網址<input id="lessonCoverUrl" name="cover_url" maxlength="500" placeholder="https://… 或 ./icons/封面.png" /></label>
       <label>內文<textarea name="body" rows="10" required maxlength="8000" placeholder="純文字，短句分行較好讀"></textarea></label>
-      <p class="hint">純文字，沒有影片。線上儲存僅站長帳號。離線請編輯 <code>site/content/lessons.json</code> 後部署。</p>
+      <p class="hint">選填一張封面（https 圖片網址，或網站內路徑）。列表會顯示在標題上方。純文字內文，沒有影片。線上儲存／刪除僅站長帳號。離線請編輯 <code>site/content/lessons.json</code> 後部署。</p>
       <div class="dialog-actions">
         <button type="button" class="ghost-btn" id="cancelLessonBtn">取消</button>
         <button type="submit" class="primary-btn">儲存</button>

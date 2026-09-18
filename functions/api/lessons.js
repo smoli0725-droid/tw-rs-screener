@@ -1,48 +1,16 @@
 import { json } from '../_lib/cors.js';
 import { getSiteContent, putSiteContent } from '../_lib/db.js';
+import { normalizeList } from '../_lib/lessons.js';
 import { isSiteOwner } from '../_lib/owner.js';
 import { createClerkClient } from '@clerk/backend';
 
-const MAX_LESSONS = 50;
-const MAX_TITLE = 80;
-const MAX_BODY = 8000;
 const MAX_BODY_BYTES = 256 * 1024;
+const SEED_PATH = '/content/lessons.json';
 
 function jwtKeyFromEnv(env) {
   const raw = env.CLERK_JWT_KEY;
   if (!raw || !String(raw).trim()) return undefined;
   return String(raw).replace(/\\n/g, '\n');
-}
-
-function normalizeLesson(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const id = String(raw.id || '').trim();
-  const title = String(raw.title || '').trim();
-  const body = String(raw.body || '').trim();
-  if (!id || !title || !body) return null;
-  if (id.length > 80 || title.length > MAX_TITLE || body.length > MAX_BODY) return null;
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/.test(id)) return null;
-  return {
-    id,
-    title,
-    body,
-    published_at: String(raw.published_at || '').slice(0, 10),
-  };
-}
-
-function normalizeList(raw) {
-  if (!Array.isArray(raw)) return null;
-  if (raw.length > MAX_LESSONS) return null;
-  const out = [];
-  const seen = new Set();
-  for (const item of raw) {
-    const lesson = normalizeLesson(item);
-    if (!lesson) return null;
-    if (seen.has(lesson.id)) return null;
-    seen.add(lesson.id);
-    out.push(lesson);
-  }
-  return out;
 }
 
 async function loadOwnerUser(env, userId) {
@@ -52,6 +20,43 @@ async function loadOwnerUser(env, userId) {
     jwtKey: jwtKeyFromEnv(env),
   });
   return clerk.users.getUser(userId);
+}
+
+async function requireOwner(env, data, request) {
+  let user;
+  try {
+    user = await loadOwnerUser(env, data.userId);
+  } catch (err) {
+    console.error('Clerk getUser failed', err);
+    return { error: json({ error: 'Forbidden' }, 403, request, env) };
+  }
+  if (!isSiteOwner(user, env)) {
+    return { error: json({ error: 'Forbidden' }, 403, request, env) };
+  }
+  return { user };
+}
+
+async function fetchSeedLessons(request) {
+  try {
+    const url = new URL(SEED_PATH, request.url);
+    const res = await fetch(url.toString(), { cf: { cacheTtl: 0 } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return normalizeList(data && data.lessons);
+  } catch (err) {
+    console.error('seed lessons fetch failed', err);
+    return null;
+  }
+}
+
+async function currentLessons(env, request) {
+  const row = await getSiteContent(env.DB, 'lessons');
+  if (row) {
+    const lessons = normalizeList(row.value);
+    if (lessons) return { lessons, from: 'd1', row };
+  }
+  const seed = await fetchSeedLessons(request);
+  return { lessons: seed || [], from: seed ? 'seed' : 'empty', row: null };
 }
 
 export async function onRequestGet({ request, env }) {
@@ -78,16 +83,8 @@ export async function onRequestPut({ request, env, data }) {
   if (length > MAX_BODY_BYTES) {
     return json({ error: 'Payload too large' }, 413, request, env);
   }
-  let user;
-  try {
-    user = await loadOwnerUser(env, data.userId);
-  } catch (err) {
-    console.error('Clerk getUser failed', err);
-    return json({ error: 'Forbidden' }, 403, request, env);
-  }
-  if (!isSiteOwner(user, env)) {
-    return json({ error: 'Forbidden' }, 403, request, env);
-  }
+  const owner = await requireOwner(env, data, request);
+  if (owner.error) return owner.error;
   let body;
   try {
     body = await request.json();
@@ -104,5 +101,27 @@ export async function onRequestPut({ request, env, data }) {
   } catch (err) {
     console.error('PUT /api/lessons failed', err);
     return json({ error: 'Failed to save lessons' }, 500, request, env);
+  }
+}
+
+export async function onRequestDelete({ request, env, data }) {
+  const owner = await requireOwner(env, data, request);
+  if (owner.error) return owner.error;
+  const url = new URL(request.url);
+  const id = String(url.searchParams.get('id') || '').trim();
+  if (!id) {
+    return json({ error: 'id required' }, 400, request, env);
+  }
+  try {
+    const current = await currentLessons(env, request);
+    const next = current.lessons.filter((row) => row.id !== id);
+    if (next.length === current.lessons.length) {
+      return json({ error: 'Lesson not found' }, 404, request, env);
+    }
+    const updated_at = await putSiteContent(env.DB, 'lessons', next, data.userId);
+    return json({ ok: true, lessons: next, source: 'd1', updated_at }, 200, request, env);
+  } catch (err) {
+    console.error('DELETE /api/lessons failed', err);
+    return json({ error: 'Failed to delete lesson' }, 500, request, env);
   }
 }

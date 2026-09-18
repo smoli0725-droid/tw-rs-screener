@@ -11,6 +11,6 @@ window.RS_CONFIG = {
   // Local: edit this file or set the same value in .dev.vars for Functions.
   CLERK_PUBLISHABLE_KEY: '__CLERK_PUBLISHABLE_KEY__',
   API_BASE: '',
-  // Teaching page: only these Clerk emails (or publicMetadata.role = "owner") can create/edit.
+  // Teaching page: only these Clerk emails (or publicMetadata.role = "owner") can create/edit/delete.
   OWNER_EMAILS: ['smoli0725@gmail.com'],
 };

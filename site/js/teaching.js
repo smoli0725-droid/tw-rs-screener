@@ -2,6 +2,7 @@ window.RS_TEACHING = (() => {
   const SEED_URL = './content/lessons.json';
   const MAX_TITLE = 80;
   const MAX_BODY = 8000;
+  const MAX_COVER_URL = 500;
 
   const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -25,6 +26,26 @@ window.RS_TEACHING = (() => {
     return `${t.slice(0, max).replace(/\s+\S*$/, '')}…`;
   }
 
+  function normalizeCoverUrl(raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s) return '';
+    if (s.length > MAX_COVER_URL) return '';
+    if (/[\s<>"'`\\]/.test(s)) return '';
+    if (s.startsWith('./') || (s.startsWith('/') && !s.startsWith('//'))) {
+      if (s.includes('..') || s.includes('//')) return '';
+      if (!/^(\.\/|\/)[A-Za-z0-9._~/-]+$/.test(s)) return '';
+      return s;
+    }
+    try {
+      const u = new URL(s);
+      if (u.protocol !== 'https:') return '';
+      if (u.username || u.password) return '';
+      return u.href;
+    } catch {
+      return '';
+    }
+  }
+
   function normalizeLesson(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const id = String(raw.id || '').trim();
@@ -32,7 +53,8 @@ window.RS_TEACHING = (() => {
     const body = String(raw.body || raw.passage || '').trim();
     if (!id || !title || !body) return null;
     const published = String(raw.published_at || raw.date || '').slice(0, 10);
-    return { id, title, body, published_at: published };
+    const cover_url = normalizeCoverUrl(raw.cover_url || raw.image);
+    return { id, title, body, published_at: published, cover_url };
   }
 
   function normalizeList(raw) {
@@ -166,6 +188,16 @@ window.RS_TEACHING = (() => {
     bar.hidden = !owner;
   }
 
+  function coverHtml(lesson, extraClass = '') {
+    if (!lesson.cover_url) return '';
+    const cls = extraClass ? `post-cover ${extraClass}` : 'post-cover';
+    return `<img class="${cls}" src="${esc(lesson.cover_url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`;
+  }
+
+  function metaHtml(lesson) {
+    return `<div class="post-meta">${esc(lesson.published_at || '')}${lesson.published_at ? ' · ' : ''}閃電選股</div>`;
+  }
+
   function renderList() {
     renderOwnerBar();
     const el = $('#teachingList');
@@ -174,33 +206,56 @@ window.RS_TEACHING = (() => {
       el.innerHTML = '<div class="empty">尚無教學文章</div>';
       return;
     }
+    const owner = isOwner();
     el.innerHTML = lessons
-      .map(
-        (lesson) => `<article class="post" data-lesson-id="${esc(lesson.id)}" role="button" tabindex="0">
-        <h2 class="post-title">${esc(lesson.title)}</h2>
-        <div class="post-meta">${esc(lesson.published_at || '')}${lesson.published_at ? ' · ' : ''}閃電選股</div>
-        <p class="post-excerpt">${esc(excerpt(lesson.body))}</p>
-      </article>`
-      )
+      .map((lesson) => {
+        const cover = coverHtml(lesson);
+        const del = owner
+          ? `<button type="button" class="ghost-btn post-delete" data-delete-lesson="${esc(lesson.id)}">刪除</button>`
+          : '';
+        return `<article class="post${cover ? ' has-cover' : ''}" data-lesson-id="${esc(lesson.id)}" role="button" tabindex="0">
+        ${cover}
+        <div class="post-copy">
+          <h2 class="post-title">${esc(lesson.title)}</h2>
+          <p class="post-excerpt">${esc(excerpt(lesson.body))}</p>
+          <div class="post-foot">${metaHtml(lesson)}${del}</div>
+        </div>
+      </article>`;
+      })
       .join('');
+    bindCoverErrors(el);
   }
 
   function renderDetail(lesson) {
     renderOwnerBar();
     const el = $('#teachingDetail');
     if (!el) return;
+    const cover = coverHtml(lesson, 'post-cover-detail');
     const ownerBtns = isOwner()
       ? `<div class="item-actions teaching-owner-actions">
           <button type="button" class="ghost-btn" data-edit-lesson="${esc(lesson.id)}">編輯</button>
           <button type="button" class="ghost-btn" data-delete-lesson="${esc(lesson.id)}">刪除</button>
         </div>`
       : '';
-    el.innerHTML = `<article class="post post-detail">
-      <h2 class="post-title">${esc(lesson.title)}</h2>
-      <div class="post-meta">${esc(lesson.published_at || '')}${lesson.published_at ? ' · ' : ''}閃電選股</div>
-      <p class="post-body">${esc(lesson.body)}</p>
-      ${ownerBtns}
+    el.innerHTML = `<article class="post post-detail${cover ? ' has-cover' : ''}">
+      ${cover}
+      <div class="post-copy">
+        <h2 class="post-title">${esc(lesson.title)}</h2>
+        ${metaHtml(lesson)}
+        <p class="post-body">${esc(lesson.body)}</p>
+        ${ownerBtns}
+      </div>
     </article>`;
+    bindCoverErrors(el);
+  }
+
+  function bindCoverErrors(root) {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    root.querySelectorAll('img.post-cover').forEach((img) => {
+      img.addEventListener('error', () => {
+        img.hidden = true;
+      });
+    });
   }
 
   function render() {
@@ -221,6 +276,7 @@ window.RS_TEACHING = (() => {
     form.id.value = lesson ? lesson.id : '';
     form.title.value = lesson ? lesson.title : '';
     form.body.value = lesson ? lesson.body : '';
+    form.cover_url.value = lesson && lesson.cover_url ? lesson.cover_url : '';
     form.published_at.value = lesson && lesson.published_at ? lesson.published_at : new Date().toISOString().slice(0, 10);
     dialog.showModal();
   }
@@ -230,18 +286,22 @@ window.RS_TEACHING = (() => {
     if (dialog && dialog.open) dialog.close();
   }
 
+  function applySaved(payload, fallback) {
+    if (payload && Array.isArray(payload.lessons)) {
+      lessons = normalizeList(payload.lessons);
+    } else {
+      lessons = fallback;
+    }
+    source = 'd1';
+    sortLessons();
+  }
+
   async function persist(next) {
     if (!window.RS_API || typeof window.RS_API.putLessons !== 'function') {
       throw new Error('no-api');
     }
     const payload = await window.RS_API.putLessons(next);
-    if (payload && Array.isArray(payload.lessons)) {
-      lessons = normalizeList(payload.lessons);
-    } else {
-      lessons = next;
-    }
-    source = 'd1';
-    sortLessons();
+    applySaved(payload, next);
   }
 
   async function saveFromForm(form) {
@@ -252,6 +312,12 @@ window.RS_TEACHING = (() => {
     const title = String(form.title.value || '').trim();
     const body = String(form.body.value || '').trim();
     const published_at = String(form.published_at.value || '').slice(0, 10);
+    const coverInput = String(form.cover_url.value || '').trim();
+    const cover_url = normalizeCoverUrl(coverInput);
+    if (coverInput && !cover_url) {
+      toast('封面請貼 https 圖片網址，或網站內路徑');
+      return;
+    }
     if (!title || !body) {
       toast('請填寫標題與內文');
       return;
@@ -262,7 +328,7 @@ window.RS_TEACHING = (() => {
     }
     const id = String(form.id.value || '').trim() || newId();
     const next = lessons.filter((row) => row.id !== id);
-    next.push({ id, title, body, published_at });
+    next.push({ id, title, body, published_at, cover_url });
     try {
       await persist(next);
       closeEditor();
@@ -276,6 +342,7 @@ window.RS_TEACHING = (() => {
   }
 
   function openDelete(id) {
+    if (!isOwner()) return;
     const lesson = lessons.find((row) => row.id === id);
     if (!lesson) return;
     pendingDeleteId = id;
@@ -285,15 +352,29 @@ window.RS_TEACHING = (() => {
     if (dialog) dialog.showModal();
   }
 
+  async function removeLesson(id) {
+    const next = lessons.filter((row) => row.id !== id);
+    if (window.RS_API && typeof window.RS_API.deleteLesson === 'function') {
+      try {
+        const payload = await window.RS_API.deleteLesson(id);
+        applySaved(payload, next);
+        return;
+      } catch (err) {
+        if (err && (err.status === 403 || err.status === 401)) throw err;
+      }
+    }
+    await persist(next);
+  }
+
   async function confirmDelete() {
     if (!pendingDeleteId) return;
     if (!isOwner()) {
       toast('只有站長可以編輯');
       return;
     }
-    const next = lessons.filter((row) => row.id !== pendingDeleteId);
+    const id = pendingDeleteId;
     try {
-      await persist(next);
+      await removeLesson(id);
       pendingDeleteId = null;
       const dialog = $('#deleteLessonDialog');
       if (dialog && dialog.open) dialog.close();
@@ -312,12 +393,20 @@ window.RS_TEACHING = (() => {
     const list = $('#teachingList');
     if (list) {
       list.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('[data-delete-lesson]');
+        if (delBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          openDelete(delBtn.dataset.deleteLesson);
+          return;
+        }
         const post = e.target.closest('[data-lesson-id]');
         if (!post) return;
         openDetail(post.dataset.lessonId);
       });
       list.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
+        if (e.target.closest('[data-delete-lesson]')) return;
         const post = e.target.closest('[data-lesson-id]');
         if (!post) return;
         e.preventDefault();
@@ -373,6 +462,7 @@ window.RS_TEACHING = (() => {
     excerpt,
     normalizeLesson,
     normalizeList,
+    normalizeCoverUrl,
     isOwner,
     getLessons: () => lessons.slice(),
     getSource: () => source,

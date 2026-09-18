@@ -52,5 +52,7 @@ window.RS_API = (() => {
     getLessons: () => request('/api/lessons'),
     putLessons: (lessons) =>
       request('/api/lessons', { method: 'PUT', body: JSON.stringify({ lessons }) }),
+    deleteLesson: (id) =>
+      request(`/api/lessons?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
   };
 })();
