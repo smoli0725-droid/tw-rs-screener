@@ -1,15 +1,15 @@
 {
   "data_date": "2026-09-18",
-  "generated_at": "2026-09-19T01:12:07.428358+08:00",
+  "generated_at": "2026-09-19T22:13:00.704848+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-09-19T01:11:58.751384+08:00",
+  "source_checked_at": "2026-09-19T22:12:52.322760+08:00",
   "message": "週末,沿用 2026-09-18",
   "twse_cross_check": null,
   "price_overlay": {
     "applied": false,
     "source": null,
-    "twse_date": "2026-09-17",
+    "twse_date": "2026-09-18",
     "yahoo_date": "2026-09-18",
     "listed_filled": 0,
     "appended_row": false,
@@ -18,11 +18,11 @@
   },
   "counts": {
     "rs85": 291,
-    "patterns": 25,
-    "pattern_symbols": 25,
-    "near_breakout": 9,
-    "broke_out": 5,
-    "ohlcv_symbols": 70,
+    "patterns": 27,
+    "pattern_symbols": 27,
+    "near_breakout": 11,
+    "broke_out": 9,
+    "ohlcv_symbols": 73,
     "universe": 1961
   },
   "market": {
@@ -32,7 +32,7 @@
     "wins": 15,
     "losses": 16,
     "pending": 31,
-    "recovered": 4,
+    "recovered": 5,
     "win_rate": 0.484,
     "label": "市況不佳",
     "rules": {
