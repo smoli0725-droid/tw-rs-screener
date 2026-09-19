@@ -54,7 +54,7 @@ class PatternParams:
     vcp_shrink_lo: float = 0.35          # 每段深度 ≈ 前段 × (0.35~0.80)
     vcp_shrink_hi: float = 0.80
     vcp_last_max_pct: float = 10.0       # 最後一段 ≤ 10%
-    vcp_max_high_rise: float = 0.15      # 後段回檔高點 ≤ 前段高點 × (1+this);超過視為急漲非收縮
+    vcp_max_high_rise: float = 0.0       # 後段回檔高點 ≤ 前段高點(等高低可;抬升即中斷收縮)
     vcp_max_vol_dry_ratio: float | None = None  # 若設定,量比 ≥ 此值則不列 VCP(預設不啟用)
 
     # 作弊型態(基底 + 基底內停頓區;停頓區位置決定 低位 / 中段 3-C / 上緣杯柄)
@@ -288,7 +288,7 @@ def detect_vcp(o: pd.Series, h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Ser
                 break
             prev_high = seq[-1]["high"]["price"]
             cur_high = legs[j]["high"]["price"]
-            # 後段回檔高點大幅抬升 = 急漲,不是收縮(即使深度看起來變淺)
+            # 後段回檔高點抬升(預設 0%:cur_high ≤ prev_high)→ 急漲而非收縮
             if prev_high > 0 and cur_high > prev_high * (1 + p.vcp_max_high_rise):
                 break
             ratio = cur / prev
