@@ -7,7 +7,9 @@
 * 成功:突破後收盤 ≥ pivot × (1 + success_pct)
 * 失敗:突破後收盤 ≤ pivot × (1 - fail_pct)
 * 復甦:失敗後收盤回到 pivot 下方 0~near_pivot_pct → 重新列入「即將突破」;
-  若再收過 pivot 則開一筆新交易。
+  須以現行參數重跑對應偵測器(作弊→detect_cheat_pattern, VCP→detect_vcp),
+  未通過不得注入、不得把帳本凍結的舊 pivot / pattern_label 當成有效結構;
+  若再收過 pivot 且結構仍通過則開一筆新交易。
 * 同代號仍有進行中時禁止再開:候選突破日若落在既有交易的進行區間
   [breakout_date, outcome_date](含兩端;尚無 outcome_date 視為仍進行中),不得再開新單。
 
@@ -26,7 +28,7 @@ from typing import Any
 
 import pandas as pd
 
-from pattern_screener import PARAMS, PatternParams, STATUS_BROKE, STATUS_EXTENDED
+from pattern_screener import PARAMS, PatternParams, STATUS_BROKE, STATUS_EXTENDED, series_for_symbol, rerun_detector
 
 LEDGER_VERSION = 1
 WINDOW_DAYS = 10             # 近兩週 = 10 個交易日
@@ -165,10 +167,21 @@ def _symbol_occupied_on(trades: list[dict], sid: str, date_str: str) -> bool:
     return any(x.get("id") == sid and _trade_active_on(x, date_str) for x in trades)
 
 
+def _live_structure_ok(trade: dict, ohlcv: dict | None, p: PatternParams) -> bool:
+    """帳本復甦／再突破前,以現行參數重跑對應偵測器。無 ohlcv 時維持舊的價格路徑(測試用)。"""
+    if ohlcv is None:
+        return True
+    bundle = series_for_symbol(ohlcv, trade.get("yf_ticker") or "")
+    if bundle is None:
+        return False
+    return rerun_detector(trade.get("pattern"), *bundle, p) is not None
+
+
 # ---------------------------------------------------------------- core
 def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
                   data_date: str, p: PatternParams = PARAMS,
-                  first_run_lookback: int = 30) -> dict:
+                  first_run_lookback: int = 30,
+                  ohlcv: dict | None = None) -> dict:
     """以今日型態命中 + 收盤資料更新帳本(就地修改並回傳)。
 
     hits: screen_patterns 的輸出(含 代號/名稱/市場/yf_ticker/pivot/status/breakout_date/primary)。
@@ -202,6 +215,9 @@ def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
         t["last_close"] = last
         if last >= pivot:
             # 再突破 → 開新交易,舊交易標記 reentered
+            if not _live_structure_ok(t, ohlcv, p):
+                t["status"] = TRADE_FAILED
+                continue
             occupied = _symbol_occupied_on(trades + new_trades, t["id"], data_date)
             already = any(x["id"] == t["id"] and x["status"] == TRADE_ACTIVE
                           for x in trades + new_trades)
@@ -211,7 +227,7 @@ def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
                     new_trades.append(nt)
             t["status"] = TRADE_REENTERED
         elif last >= pivot * (1 - p.near_pivot_pct / 100):
-            t["status"] = TRADE_RECOVERED
+            t["status"] = TRADE_RECOVERED if _live_structure_ok(t, ohlcv, p) else TRADE_FAILED
         else:
             t["status"] = TRADE_FAILED
     trades.extend(new_trades)

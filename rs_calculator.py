@@ -730,7 +730,7 @@ def main():
         # 突破交易帳本:pivot 在突破日凍結,逐日判定成功/失敗,彙整近兩週勝率
         ledger_path = os.path.join("output", "app", "breakouts_ledger.json")
         ledger = load_ledger(ledger_path)
-        update_ledger(ledger, patterns, close, freshness["data_date"])
+        update_ledger(ledger, patterns, close, freshness["data_date"], ohlcv=ohlcv)
         save_ledger(ledger, ledger_path)
         m = ledger.get("market") or {}
         print(f"[breakouts] {m.get('label')} 勝率={m.get('win_rate')} "

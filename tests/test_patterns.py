@@ -45,7 +45,7 @@ from breakout_tracker import (
     TRADE_RECOVERED,
     TRADE_REENTERED,
 )
-from export_app_json import export_app_json
+from export_app_json import export_app_json, _recovered_rows
 from rs_calculator import (
     check_freshness,
     compute_rs,
@@ -132,20 +132,124 @@ def make_flag_series(n: int = 200):
     return _ohlc_from_close(close, vol_base=150_000)
 
 
+def make_vcp_soft_channel_series(n: int = 200):
+    """合成 10%→9% 兩段(軟通道,非 VCP):第一段過淺、收縮比 0.9 超出硬門檻。"""
+    dates = _dates(n)
+    px = np.full(n, 100.0)
+    for i in range(40):
+        px[i] = 60 + i
+    base = max(40, n - 90)
+    px[base] = 100
+    for i, p in enumerate(np.linspace(100, 90, 10)):
+        px[base + 1 + i] = p
+    for i, p in enumerate(np.linspace(90, 99, 10)):
+        px[base + 11 + i] = p
+    for i, p in enumerate(np.linspace(99, 90.09, 8)):
+        px[base + 21 + i] = p
+    for i, p in enumerate(np.linspace(90.09, 96.0, 8)):
+        px[base + 29 + i] = p
+    last = base + 37
+    px[last:] = 96.0
+    close = pd.Series(px, index=dates)
+    o, h, l, c, v = _ohlc_from_close(close)
+    v.iloc[:] = 200_000
+    v.iloc[-30:] = 80_000
+    for i in range(n):
+        h.iloc[i] = max(h.iloc[i], c.iloc[i])
+        l.iloc[i] = min(l.iloc[i], c.iloc[i])
+    return o, h, l, c, v
+
+
+def make_vcp_valid_contraction_series(n: int = 220):
+    """合成 25%→12%→7%,週數 ≥ 3、高點抬升在 15% 內,應可通過硬收縮。"""
+    dates = _dates(n)
+    px = np.full(n, 100.0)
+    for i in range(40):
+        px[i] = 60 + i
+    base = max(40, n - 110)
+    px[base] = 100
+    for i, p in enumerate(np.linspace(100, 75, 12)):
+        px[base + 1 + i] = p
+    for i, p in enumerate(np.linspace(75, 99, 12)):
+        px[base + 13 + i] = p
+    for i, p in enumerate(np.linspace(99, 87.12, 10)):
+        px[base + 25 + i] = p
+    for i, p in enumerate(np.linspace(87.12, 98, 10)):
+        px[base + 35 + i] = p
+    for i, p in enumerate(np.linspace(98, 91.14, 8)):
+        px[base + 45 + i] = p
+    for i, p in enumerate(np.linspace(91.14, 96.0, 8)):
+        px[base + 53 + i] = p
+    last = base + 61
+    px[last:] = 96.0
+    close = pd.Series(px, index=dates)
+    o, h, l, c, v = _ohlc_from_close(close)
+    v.iloc[:] = 200_000
+    v.iloc[-30:] = 80_000
+    for i in range(n):
+        h.iloc[i] = max(h.iloc[i], c.iloc[i])
+        l.iloc[i] = min(l.iloc[i], c.iloc[i])
+    return o, h, l, c, v
+
+
+def _rounded_cup_drop(hi: float, lo: float, bars: int = 22) -> np.ndarray:
+    """圓弧杯:大部分跌幅在前段,最後約 8 根只收尾,避免被判成 V 底。"""
+    round_bars = min(8, max(4, bars // 3))
+    early_n = bars - round_bars
+    hinge = lo + (hi - lo) * 0.10
+    return np.concatenate([
+        np.linspace(hi, hinge, early_n, endpoint=False),
+        np.linspace(hinge, lo, round_bars),
+    ])
+
+
 def make_cheat_series(pause_level: float, pause_bars: int = 12, n: int = 250):
-    """基底:平台 60 → 漲到 100(左高)→ 跌到 70(底)→ 反彈到 pause_level 附近盤整。"""
+    """基底:平台 60 → 漲到 100(左高)→ 圓弧跌到 70(底)→ 反彈到停頓帶下方 → 盤整 pause_bars 根。
+
+    反彈不走進停頓高低差,避免與停頓區黏成更長的盤整(9 根 vs 10 根測試才有意義)。
+    最後一根當「今天」排除在停頓統計外。
+    """
     dates = _dates(n)
     px = np.full(n, 60.0)
-    rise_start = n - 40 - 10 - 12 - pause_bars - 1
-    for i, p in enumerate(np.linspace(60, 100, 40)):
+    rise, cup_down, bounce = 40, 22, 5
+    rise_start = n - rise - cup_down - bounce - pause_bars - 1
+    for i, p in enumerate(np.linspace(60, 100, rise)):
         px[rise_start + i] = p
-    drop_start = rise_start + 40
-    for i, p in enumerate(np.linspace(100, 70, 10)):
-        px[drop_start + i] = p
-    up_start = drop_start + 10
-    for i, p in enumerate(np.linspace(70, pause_level, 12)):
+    drop_start = rise_start + rise
+    drop = _rounded_cup_drop(100, 70, cup_down)
+    px[drop_start:drop_start + cup_down] = drop
+    up_start = drop_start + cup_down
+    # 短促反彈停在停頓帶下方,避免最後幾根跟盤整黏成 ≥10 根
+    pre = min(pause_level * 0.88, pause_level - 9)
+    pre = max(70.0, pre)
+    for i, p in enumerate(np.linspace(70, pre, bounce)):
         px[up_start + i] = p
-    pause_start = up_start + 12
+    pause_start = up_start + bounce
+    for i in range(pause_bars):
+        px[pause_start + i] = pause_level * (1.02 if i % 2 == 0 else 0.98)
+    px[pause_start + pause_bars:] = pause_level
+    close = pd.Series(px, index=dates)
+    return _ohlc_from_close(close, vol_base=120_000)
+
+
+def make_cheat_v_bottom_series(pause_level: float = 85.0, pause_bars: int = 12, n: int = 250):
+    """杯深 30%,但底部前 4 根從 88 急殺到 70(佔杯深 ≥ 45%)→ V 底,不列作弊。"""
+    dates = _dates(n)
+    px = np.full(n, 60.0)
+    rise, slow, plunge, bounce = 40, 18, 4, 12
+    rise_start = n - rise - slow - plunge - bounce - pause_bars - 1
+    for i, p in enumerate(np.linspace(60, 100, rise)):
+        px[rise_start + i] = p
+    d0 = rise_start + rise
+    for i, p in enumerate(np.linspace(100, 88, slow)):
+        px[d0 + i] = p
+    p0 = d0 + slow
+    for i, p in enumerate(np.linspace(88, 70, plunge)):
+        px[p0 + i] = p
+    u0 = p0 + plunge
+    for i, p in enumerate(np.linspace(70, pause_level, bounce)):
+        px[u0 + i] = p
+    pause_start = u0 + bounce
     for i in range(pause_bars):
         px[pause_start + i] = pause_level * (1.02 if i % 2 == 0 else 0.98)
     px[pause_start + pause_bars:] = pause_level
@@ -154,9 +258,9 @@ def make_cheat_series(pause_level: float, pause_bars: int = 12, n: int = 250):
 
 
 def make_staircase_base_series(n: int = 250):
-    """富采式:100 → 階梯下跌(彈 68、58)→ 底 52 → 反彈到 70~74 停頓。
+    """富采式:100 → 階梯下跌(彈 78、66)→ 底 58 → 反彈到 75 停頓。
 
-    左緣應是 100(整段修正 48%),不是最後一個小反彈的 58。
+    左緣應是 100(整段修正 42%,在 45% 上限內),不是最後一個小反彈的 66。
     """
     dates = _dates(n)
     px = np.full(n, 60.0)
@@ -164,17 +268,17 @@ def make_staircase_base_series(n: int = 250):
         np.linspace(60, 100, 40),   # 上漲到 100(左高)
         np.linspace(100, 70, 8),
         np.linspace(70, 78, 4),     # 小反彈
-        np.linspace(78, 60, 8),
-        np.linspace(60, 66, 4),     # 小反彈
-        np.linspace(66, 52, 8),     # 底 52
-        np.linspace(52, 72, 12),
+        np.linspace(78, 62, 8),
+        np.linspace(62, 66, 4),     # 小反彈
+        np.linspace(66, 58, 8),     # 底 58
+        np.linspace(58, 75, 12),
     ]
     seq = np.concatenate(segs)
-    pause = np.array([72 * (1.02 if i % 2 == 0 else 0.98) for i in range(10)])
+    pause = np.array([75 * (1.02 if i % 2 == 0 else 0.98) for i in range(12)])
     seq = np.concatenate([seq, pause])
     start = n - len(seq) - 1
     px[start:start + len(seq)] = seq
-    px[start + len(seq):] = 72.0
+    px[start + len(seq):] = 75.0
     close = pd.Series(px, index=dates)
     return _ohlc_from_close(close, vol_base=120_000)
 
@@ -237,7 +341,7 @@ def make_cheat_mid_then_rim_series(n: int = 280):
     px = np.full(n, 60.0)
     segs = [
         np.linspace(60, 100, 40),
-        np.linspace(100, 70, 10),
+        _rounded_cup_drop(100, 70, 22),
         np.linspace(70, 85, 12),
         np.array([85 * (1.02 if i % 2 == 0 else 0.98) for i in range(12)]),
         np.linspace(85, 96, 10),
@@ -257,7 +361,7 @@ def make_cheat_low_then_mid_series(n: int = 280):
     px = np.full(n, 60.0)
     segs = [
         np.linspace(60, 100, 40),
-        np.linspace(100, 70, 10),
+        _rounded_cup_drop(100, 70, 22),
         np.linspace(70, 75, 8),
         np.array([75 * (1.02 if i % 2 == 0 else 0.98) for i in range(12)]),
         np.linspace(75, 85, 10),
@@ -410,6 +514,41 @@ def test_vcp_rejects_sharp_rally_as_contraction():
     )) is not None
 
 
+def test_vcp_hard_shrink_rejects_soft_channel():
+    """10%→9% 兩段:收縮比 0.9 超出 0.35–0.80,即使放寬第一段深度與週數也必須失敗。"""
+    o, h, l, c, v = make_vcp_soft_channel_series()
+    p = PatternParams(
+        zigzag_pct=0.04,
+        vcp_min_first_depth_pct=0.0,
+        vcp_min_base_weeks=0.0,
+        vcp_last_max_pct=12.0,
+    )
+    assert detect_vcp(o, h, l, c, v, p) is None
+    assert detect_vcp(o, h, l, c, v) is None
+
+
+def test_vcp_valid_25_12_7_may_pass():
+    """25%→12%→7%、週數 ≥ 3、高點抬升在 15% 內 → 硬收縮可通過。"""
+    o, h, l, c, v = make_vcp_valid_contraction_series()
+    p = PatternParams(zigzag_pct=0.04)
+    hit = detect_vcp(o, h, l, c, v, p)
+    assert hit is not None
+    assert hit["legs"] >= 2
+    assert hit["base_weeks"] >= 3
+    assert hit["depth_pct"] >= 12
+    depths = hit["detail"]["depths"]
+    for a, b in zip(depths, depths[1:]):
+        ratio = b / a
+        assert 0.35 <= ratio <= 0.80, (depths, ratio)
+    assert depths[-1] <= 10
+
+
+def test_vcp_3532_soft_channel_rejected():
+    """3532 台勝科 2026-09-18 附近:10%→9%、週數不足,不得列 VCP。"""
+    o, h, l, c, v = _load_app_ohlcv("3532")
+    assert detect_vcp(o, h, l, c, v) is None
+
+
 def test_detect_high_tight_flag():
     o, h, l, c, v = make_flag_series()
     p = PatternParams(flag_prior_gain=0.9, flag_range_pct=0.12, flag_max_retrace=0.30)
@@ -449,8 +588,8 @@ def test_cheat_base_left_high_is_start_of_decline():
     assert hit is not None
     left = next(a for a in hit["annotations"] if a["type"] == "cup_left")
     assert left["price"] > 95, left
-    assert 40 <= hit["depth_pct"] <= 55
-    # 停頓區 72 在 52~100 的中段 → 3-C
+    assert 38 <= hit["depth_pct"] <= 45
+    # 停頓區 75 在 58~100 的中段 → 3-C
     assert hit["detail"]["position"] == CHEAT_POS_MID
 
 
@@ -493,6 +632,39 @@ def test_cheat_default_prefers_mid_over_low():
     assert low_hit["pivot"] < hit["pivot"]
 
 
+def test_cheat_pause_nine_bars_fails_ten_can_pass():
+    """停頓 9 根即使高低差合格也失敗;10 根且其餘條件相同可以過。"""
+    o9, h9, l9, c9, v9 = make_cheat_series(85.0, pause_bars=9)
+    assert detect_cheat_pattern(o9, h9, l9, c9, v9) is None
+    o10, h10, l10, c10, v10 = make_cheat_series(85.0, pause_bars=10)
+    hit = detect_cheat_pattern(o10, h10, l10, c10, v10)
+    assert hit is not None
+    assert hit["detail"]["position"] == CHEAT_POS_MID
+    assert hit["detail"]["position"] != CHEAT_POS_UPPER
+
+
+def test_cheat_v_bottom_rejected():
+    """底部前急殺佔杯深 ≥ 45% → 不列作弊。"""
+    o, h, l, c, v = make_cheat_v_bottom_series()
+    assert detect_cheat_pattern(o, h, l, c, v) is None
+
+
+def test_cheat_rim_never_labeled_mid_3c():
+    """上緣停頓只標杯柄,不得寫成中段 3-C。"""
+    o, h, l, c, v = make_cheat_series(96.0)
+    hit = detect_cheat_pattern(o, h, l, c, v)
+    assert hit is not None
+    assert hit["detail"]["position"] == CHEAT_POS_UPPER
+    assert hit["detail"]["position"] != CHEAT_POS_MID
+
+
+def test_cheat_3680_not_mid_3c():
+    """3680 家登:短停頓 + V 底 / 樞紐 ~551 結構不得標中段 3-C,現行參數下不列作弊。"""
+    o, h, l, c, v = _load_app_ohlcv("3680")
+    hit = detect_cheat_pattern(o, h, l, c, v)
+    assert hit is None
+
+
 def _load_app_ohlcv(sid: str):
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         "output", "app", "ohlcv", f"{sid}.json")
@@ -518,9 +690,12 @@ def test_vcp_4908_false_structure_rejected():
 
 
 def test_cheat_6021_prefers_mid_pause():
-    """6021:中段停頓(pivot ~39.95–41)優於較新的上緣 42.65。"""
+    """6021:中段停頓(pivot ~39.95–41)優於較新的上緣 42.65。
+
+    現行 V 底門檻會擋這檔最後一週的集中跌幅;此測只驗證停頓區偏好,故關閉 V 底。
+    """
     o, h, l, c, v = _load_app_ohlcv("6021")
-    hit = detect_cheat_pattern(o, h, l, c, v)
+    hit = detect_cheat_pattern(o, h, l, c, v, PatternParams(cheat_v_bottom_frac=1.0))
     assert hit is not None
     assert hit["detail"]["position"] == CHEAT_POS_MID
     assert 39.5 <= hit["pivot"] <= 41.0
@@ -561,6 +736,53 @@ def test_mark_primary_prefers_newest_structure():
     ]
     mark_primary(hits2)
     assert [h["pattern"] for h in hits2 if h["primary"]] == ["雙重底"]
+
+
+def _ohlcv_pack(o, h, l, c, v, ticker: str) -> dict:
+    return {k: pd.DataFrame({ticker: s}) for k, s in
+            zip(("Open", "High", "Low", "Close", "Volume"), (o, h, l, c, v))}
+
+
+def test_recovered_rows_skip_when_live_detector_fails():
+    """家登失敗後,現行參數重跑作弊失敗 → 不得注入「作弊型態（復甦）」。"""
+    o, h, l, c, v = _load_app_ohlcv("3680")
+    ticker = "3680.TWO"
+    ohlcv = _ohlcv_pack(o, h, l, c, v, ticker)
+    ledger = empty_ledger()
+    ledger["trades"] = [{
+        "id": "3680", "name": "家登", "market": "上櫃",
+        "pattern": "作弊型態", "pattern_label": "作弊型態",
+        "yf_ticker": ticker, "rs": 87, "pivot": 551.0,
+        "status": TRADE_RECOVERED, "outcome": TRADE_FAILED,
+        "outcome_date": "2026-09-11", "outcome_pct": -7.44,
+        "breakout_date": "2026-09-09",
+    }]
+    rows = _recovered_rows(ledger, pd.DataFrame(), ohlcv, set())
+    assert rows == []
+
+
+def test_tracker_no_recover_when_live_cheat_fails():
+    """帳本復甦路徑若提供 ohlcv 且重跑失敗,維持 failed,不把凍結樞紐當有效結構。"""
+    o, h, l, c, v = _load_app_ohlcv("3680")
+    ticker = "3680.TWO"
+    ohlcv = _ohlcv_pack(o, h, l, c, v, ticker)
+    close_df = pd.DataFrame({ticker: c})
+    ledger = empty_ledger()
+    ledger["trades"] = [{
+        "trade_id": "3680-2026-09-09-551",
+        "id": "3680", "name": "家登", "market": "上櫃",
+        "pattern": "作弊型態", "pattern_label": "作弊型態",
+        "yf_ticker": ticker, "rs": 87, "pivot": 551.0,
+        "breakout_date": "2026-09-09", "breakout_close": 566.0,
+        "origin": "pattern", "status": TRADE_FAILED, "outcome": TRADE_FAILED,
+        "outcome_date": "2026-09-11", "outcome_close": 510.0, "outcome_pct": -7.44,
+        "peak_close": 566.0, "trough_close": 510.0,
+        "last_date": "2026-09-11", "last_close": 510.0,
+    }]
+    update_ledger(ledger, [], close_df, c.index[-1].date().isoformat(), ohlcv=ohlcv)
+    t = ledger["trades"][0]
+    assert t["status"] == TRADE_FAILED
+    assert recovered_candidates(ledger) == []
 
 
 def test_export_drops_extended_rows(tmp_path):
@@ -1055,7 +1277,7 @@ def test_full_pipeline_test_mode(tmp_path, monkeypatch):
         "twse_cross_check": None,
     }
     ledger = empty_ledger()
-    update_ledger(ledger, patterns, close, freshness["data_date"])
+    update_ledger(ledger, patterns, close, freshness["data_date"], ohlcv=ohlcv)
     meta = export_app_json(full, patterns, ohlcv, freshness,
                            outdir=str(tmp_path / "output" / "app"), ledger=ledger)
     assert (tmp_path / "output" / "app" / "meta.json").exists()
