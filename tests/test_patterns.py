@@ -200,27 +200,25 @@ def make_blowoff_series(n: int = 250):
     return _ohlc_from_close(close, vol_base=120_000)
 
 
-def make_vcp_false_rally_series(n: int = 200):
-    """深度看似收縮,但後段回檔高點大幅抬升(急漲而非 VCP)。
-
-    高點 100 → 147(~+47%),回檔深度 24%→9%。
-    """
+def make_vcp_two_leg_series(h1: float, l1: float, h2: float, l2: float, n: int = 200):
+    """兩段回檔 h1→l1 後反彈到 h2→l2,結尾貼近第二段高點。"""
     dates = _dates(n)
     px = np.full(n, 100.0)
     for i in range(40):
         px[i] = 60 + i
     base = max(40, n - 80)
-    px[base] = 100
-    for i, p in enumerate(np.linspace(100, 76, 10)):
+    px[base] = h1
+    for i, p in enumerate(np.linspace(h1, l1, 10)):
         px[base + 1 + i] = p
-    for i, p in enumerate(np.linspace(76, 147, 12)):
+    for i, p in enumerate(np.linspace(l1, h2, 12)):
         px[base + 11 + i] = p
-    for i, p in enumerate(np.linspace(147, 133.77, 6)):
+    for i, p in enumerate(np.linspace(h2, l2, 6)):
         px[base + 23 + i] = p
-    for i, p in enumerate(np.linspace(133.77, 142.0, 8)):
+    end_px = h2 * 0.97
+    for i, p in enumerate(np.linspace(l2, end_px, 8)):
         px[base + 29 + i] = p
     last = base + 37
-    px[last:] = 142.0
+    px[last:] = end_px
     close = pd.Series(px, index=dates)
     o, h, l, c, v = _ohlc_from_close(close)
     v.iloc[:] = 200_000
@@ -229,6 +227,14 @@ def make_vcp_false_rally_series(n: int = 200):
         h.iloc[i] = max(h.iloc[i], c.iloc[i])
         l.iloc[i] = min(l.iloc[i], c.iloc[i])
     return o, h, l, c, v
+
+
+def make_vcp_false_rally_series(n: int = 200):
+    """深度看似收縮,但後段回檔高點大幅抬升(急漲而非 VCP)。
+
+    高點 100 → 147(~+47%),回檔深度 24%→9%。
+    """
+    return make_vcp_two_leg_series(100, 76, 147, 133.77, n=n)
 
 
 def make_cheat_mid_then_rim_series(n: int = 280):
@@ -392,22 +398,42 @@ def test_detect_vcp():
     assert "contraction" in hit
 
 
+_VCP_SYNTH = dict(zigzag_pct=0.04, vcp_shrink_lo=0.30, vcp_shrink_hi=0.85,
+                  vcp_last_max_pct=12.0)
+
+
 def test_vcp_rejects_sharp_rally_as_contraction():
     """回檔深度仍「收縮」,但後段高點急漲(~+47%)時不得當成 VCP。"""
     o, h, l, c, v = make_vcp_false_rally_series()
-    p = PatternParams(
-        zigzag_pct=0.04,
-        vcp_shrink_lo=0.30,
-        vcp_shrink_hi=0.85,
-        vcp_last_max_pct=12.0,
-        vcp_max_high_rise=0.15,
-    )
-    assert detect_vcp(o, h, l, c, v, p) is None
+    assert detect_vcp(o, h, l, c, v, PatternParams(**_VCP_SYNTH)) is None
     # 關掉高點抬升守衛後,同一段深度收縮會被當成 VCP(證明不是深度規則殺掉)
     assert detect_vcp(o, h, l, c, v, PatternParams(
-        zigzag_pct=0.04, vcp_shrink_lo=0.30, vcp_shrink_hi=0.85,
-        vcp_last_max_pct=12.0, vcp_max_high_rise=1.0,
+        **_VCP_SYNTH, vcp_max_high_rise=1.0,
     )) is not None
+
+
+def test_vcp_rejects_later_pullback_high_above_earlier():
+    """後段回檔高點嚴格高於前段 → 中斷收縮。含舊 15% 容許內的小幅抬升(~8%)。"""
+    o, h, l, c, v = make_vcp_two_leg_series(100, 76, 108, 99)
+    assert detect_vcp(o, h, l, c, v, PatternParams(**_VCP_SYNTH)) is None
+    # 舊 vcp_max_high_rise=0.15 會誤放行,證明是高點規則而非深度
+    assert detect_vcp(o, h, l, c, v, PatternParams(
+        **_VCP_SYNTH, vcp_max_high_rise=0.15,
+    )) is not None
+
+
+def test_vcp_allows_equal_or_lower_pullback_highs():
+    """後段高點 ≤ 前段且深度收縮時仍可列 VCP;不要求後低 ≥ 前低。"""
+    p = PatternParams(**_VCP_SYNTH)
+    equal = detect_vcp(*make_vcp_two_leg_series(100, 76, 100, 90), p)
+    assert equal is not None, "等高低應仍可通過"
+    lower = detect_vcp(*make_vcp_two_leg_series(100, 76, 98, 90), p)
+    assert lower is not None, "後段更低高點應仍可通過"
+    # 後低跌破前低仍允許(只要深度收縮與高點不抬升)
+    undercut = detect_vcp(*make_vcp_two_leg_series(100, 76, 82, 73.8), p)
+    assert undercut is not None, "後低下切前低仍可通過"
+    lows = [a["price"] for a in undercut["annotations"] if a["type"] == "pullback_low"]
+    assert len(lows) >= 2 and lows[1] < lows[0]
 
 
 def test_detect_high_tight_flag():
@@ -515,6 +541,20 @@ def test_vcp_4908_false_structure_rejected():
     o, h, l, c, v = _load_app_ohlcv("4908")
     hit = detect_vcp(o, h, l, c, v)
     assert hit is None
+
+
+def test_vcp_3532_rising_pullback_highs_rejected():
+    """3532 台勝科:回檔高點 418.5→438.5,不得列 VCP。
+
+    這條只鎖高點不抬升(vcp_max_high_rise=0);不是 PR #37 的硬收縮帶。
+    舊 15% 容許下同一 OHLCV 仍會標 VCP(10%→9%)。
+    """
+    o, h, l, c, v = _load_app_ohlcv("3532")
+    assert detect_vcp(o, h, l, c, v) is None
+    old = detect_vcp(o, h, l, c, v, PatternParams(vcp_max_high_rise=0.15))
+    assert old is not None and old["pattern"] == "VCP"
+    highs = [a["price"] for a in old["annotations"] if a["type"] == "pullback_high"]
+    assert highs[:2] == [418.5, 438.5]
 
 
 def test_cheat_6021_prefers_mid_pause():
