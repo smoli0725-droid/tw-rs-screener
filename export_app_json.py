@@ -120,7 +120,10 @@ def _recovered_rows(ledger: dict | None, ranking: pd.DataFrame,
     if not ledger:
         return []
     from breakout_tracker import recovered_candidates
-    from pattern_screener import STATUS_NEAR, PARAMS, _score, vol_dry_ratio
+    from pattern_screener import (
+        STATUS_NEAR, PARAMS, _score, vol_dry_ratio,
+        series_for_symbol, rerun_detector,
+    )
 
     by_id = {str(r["代號"]): r for _, r in ranking.iterrows()} if len(ranking) else {}
     rows = []
@@ -129,17 +132,22 @@ def _recovered_rows(ledger: dict | None, ranking: pd.DataFrame,
         if sid in existing_ids:
             continue
         yf = t.get("yf_ticker") or ""
-        try:
-            c = ohlcv["Close"][yf].dropna()
-            v = ohlcv["Volume"][yf].reindex(c.index).fillna(0)
-        except Exception:
+        bundle = series_for_symbol(ohlcv, yf)
+        if bundle is None:
             continue
-        if not len(c):
+        live = rerun_detector(t.get("pattern"), *bundle, PARAMS)
+        if live is None or live.get("status") != STATUS_NEAR:
             continue
+        _, _, _, c, v = bundle
         close = float(c.iloc[-1])
-        pivot = float(t["pivot"])
+        pivot = float(live["pivot"])
         vr = vol_dry_ratio(v)
         row = by_id.get(sid)
+        detail = dict(live.get("detail") or {})
+        detail["failed_on"] = t.get("outcome_date")
+        detail["failed_pct"] = t.get("outcome_pct")
+        detail["ledger_pivot"] = round_price(t.get("pivot"))
+        live_label = live.get("pattern_label") or live.get("pattern") or t.get("pattern")
         rows.append({
             "代號": sid,
             "名稱": t.get("name") or (row["名稱"] if row is not None else sid),
@@ -150,24 +158,24 @@ def _recovered_rows(ledger: dict | None, ranking: pd.DataFrame,
             "通過樣板": row.get("通過樣板", "") if row is not None else "",
             "距50MA%": float(row["距50MA%"]) if row is not None and pd.notna(row.get("距50MA%")) else None,
             "yf_ticker": yf,
-            "pattern": t.get("pattern"),
-            "pattern_label": f"{t.get('pattern_label') or t.get('pattern')}（復甦）",
+            "pattern": live.get("pattern") or t.get("pattern"),
+            "pattern_label": f"{live_label}（復甦）",
             "pivot": round_price(pivot),
-            "dist_pivot_pct": round((close / pivot - 1) * 100, 2),
+            "dist_pivot_pct": live.get("dist_pivot_pct"),
             "status": STATUS_NEAR,
-            "score": _score(STATUS_NEAR, close, pivot, vr, 10),
-            "contraction": None,
-            "legs": None,
-            "vol_dry_ratio": None if np.isnan(vr) else round(vr, 2),
-            "base_weeks": None,
-            "depth_pct": None,
+            "score": live.get("score") or _score(STATUS_NEAR, close, pivot, vr, 10),
+            "contraction": live.get("contraction"),
+            "legs": live.get("legs"),
+            "vol_dry_ratio": live.get("vol_dry_ratio"),
+            "base_weeks": live.get("base_weeks"),
+            "depth_pct": live.get("depth_pct"),
             "primary": True,
-            "structure_date": t.get("outcome_date"),
+            "structure_date": live.get("structure_date") or t.get("outcome_date"),
             "breakout_date": None,
             "days_since_breakout": None,
             "recovered": True,
-            "annotations": [{"type": "failed_breakout", "date": t.get("breakout_date"), "price": round_price(pivot)}],
-            "detail": {"failed_on": t.get("outcome_date"), "failed_pct": t.get("outcome_pct")},
+            "annotations": live.get("annotations") or [],
+            "detail": detail,
         })
     return rows
 

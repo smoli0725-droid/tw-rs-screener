@@ -51,9 +51,11 @@ class PatternParams:
     # VCP
     vcp_min_legs: int = 2
     vcp_max_legs: int = 6
-    vcp_shrink_lo: float = 0.35          # 每段深度 ≈ 前段 × (0.35~0.80)
+    vcp_shrink_lo: float = 0.35          # 相鄰段深度比 cur/prev 必須落在 [lo, hi];出界即斷序列
     vcp_shrink_hi: float = 0.80
     vcp_last_max_pct: float = 10.0       # 最後一段 ≤ 10%
+    vcp_min_first_depth_pct: float = 12.0  # 第一段深度下限
+    vcp_min_base_weeks: float = 3.0      # 第一段高點 → 最後一段低點;weeks = bars/5
     vcp_max_high_rise: float = 0.15      # 後段回檔高點 ≤ 前段高點 × (1+this);超過視為急漲非收縮
     vcp_max_vol_dry_ratio: float | None = None  # 若設定,量比 ≥ 此值則不列 VCP(預設不啟用)
 
@@ -63,11 +65,13 @@ class PatternParams:
     cheat_prior_gain_min: float = 0.25   # 先前漲幅 ≥ 25%
     cheat_base_min_weeks: int = 3        # 左高 → 停頓區結束
     cheat_base_max_weeks: int = 45
-    cheat_min_depth: float = 0.12        # 基底修正 12~60%
-    cheat_max_depth: float = 0.60
+    cheat_min_depth: float = 0.12        # 基底修正 12~45%
+    cheat_max_depth: float = 0.45
     cheat_right_max_over: float = 0.05   # 底部之後任何高點不得高於左高 5%(否則已在漲,不是基底)
-    cheat_pause_min_bars: int = 5
+    cheat_pause_min_bars: int = 10       # 停頓區至少 N 根(含首尾)
     cheat_pause_range_pct: float = 10.0  # 停頓區高低差 ≤ 10%
+    cheat_v_bottom_bars: int = 5         # 底部前 N 根內急殺佔整段杯深過大 → 非杯底
+    cheat_v_bottom_frac: float = 0.45
     cheat_low_hi: float = 1.0 / 3.0      # 停頓區中點 < 下 1/3 → 低位
     cheat_mid_hi: float = 2.0 / 3.0      # 1/3~2/3 → 中段 3-C;> 2/3 → 上緣(杯柄)
     cheat_upper_min_weeks: int = 6       # 上緣杯柄的基底至少 6 週
@@ -281,6 +285,8 @@ def detect_vcp(o: pd.Series, h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Ser
     # 取結尾連續收縮的段落(偏好最靠近現在)
     best: list[dict] | None = None
     for start in range(len(legs)):
+        if legs[start]["depth_pct"] < p.vcp_min_first_depth_pct:
+            continue
         seq = [legs[start]]
         for j in range(start + 1, len(legs)):
             prev, cur = seq[-1]["depth_pct"], legs[j]["depth_pct"]
@@ -292,15 +298,18 @@ def detect_vcp(o: pd.Series, h: pd.Series, l: pd.Series, c: pd.Series, v: pd.Ser
             if prev_high > 0 and cur_high > prev_high * (1 + p.vcp_max_high_rise):
                 break
             ratio = cur / prev
-            if not (p.vcp_shrink_lo <= ratio <= p.vcp_shrink_hi) and cur >= prev:
-                if cur > prev * 1.05:
-                    break
+            if not (p.vcp_shrink_lo <= ratio <= p.vcp_shrink_hi):
+                break
             seq.append(legs[j])
             if len(seq) >= p.vcp_max_legs:
                 break
-        if len(seq) >= p.vcp_min_legs and seq[-1]["depth_pct"] <= p.vcp_last_max_pct:
-            if best is None or seq[-1]["low"]["idx"] >= best[-1]["low"]["idx"]:
-                best = seq
+        if len(seq) < p.vcp_min_legs or seq[-1]["depth_pct"] > p.vcp_last_max_pct:
+            continue
+        base_weeks = (seq[-1]["low"]["idx"] - seq[0]["high"]["idx"]) / 5
+        if base_weeks < p.vcp_min_base_weeks:
+            continue
+        if best is None or seq[-1]["low"]["idx"] >= best[-1]["low"]["idx"]:
+            best = seq
     if best is None:
         return None
 
@@ -372,19 +381,38 @@ def _find_base_structure(h: pd.Series, l: pd.Series, c: pd.Series,
     return best
 
 
+def _is_v_bottom(h: pd.Series, left: dict, bottom: dict,
+                 p: PatternParams) -> bool:
+    """急殺 V 底:底部前 ≤ N 根內,高點到谷底的跌幅 ≥ 整段杯深的 cheat_v_bottom_frac。"""
+    total = left["price"] - bottom["price"]
+    if total <= 0:
+        return False
+    i0 = max(0, bottom["idx"] - p.cheat_v_bottom_bars)
+    window = h.iloc[i0:bottom["idx"] + 1]
+    if window.empty:
+        return False
+    drop = float(window.max()) - bottom["price"]
+    return drop >= total * p.cheat_v_bottom_frac
+
+
 def _collect_pause_zones(h: pd.Series, l: pd.Series, c: pd.Series,
                          start_idx: int, p: PatternParams) -> list[dict]:
     """收集 start_idx 之後、pause_max_span_bars 內所有高低差 ≤ pause_range 的盤整區。
 
     不含最後一根 K:若今天是突破日,其高點不應成為自己的 pivot。
+    停頓區根數 = 含首尾的 K 線數,必須 ≥ cheat_pause_min_bars。
     """
     n = len(c) - 1  # 排除今天
-    if start_idx >= n - p.cheat_pause_min_bars:
+    min_bars = p.cheat_pause_min_bars
+    if n - start_idx < min_bars:
         return []
     max_end = min(n, start_idx + p.pause_max_span_bars + 1)
     zones: list[dict] = []
-    for end in range(start_idx + p.cheat_pause_min_bars, max_end):
-        for s in range(start_idx, end - p.cheat_pause_min_bars + 1):
+    for end in range(start_idx + min_bars - 1, max_end):
+        for s in range(start_idx, end - min_bars + 2):
+            bars = end - s + 1
+            if bars < min_bars:
+                continue
             window_h = float(h.iloc[s:end + 1].max())
             window_l = float(l.iloc[s:end + 1].min())
             mid = (window_h + window_l) / 2
@@ -396,7 +424,7 @@ def _collect_pause_zones(h: pd.Series, l: pd.Series, c: pd.Series,
                     "start_idx": s, "end_idx": end,
                     "high": window_h, "low": window_l,
                     "range_pct": round(rng, 1),
-                    "bars": end - s + 1,
+                    "bars": bars,
                 })
     return zones
 
@@ -471,9 +499,11 @@ def detect_cheat_pattern(o, h, l, c, v, p: PatternParams = PARAMS) -> dict | Non
     停頓區在基底的相對位置決定子類型:下 1/3 低位、中 1/3 3-C、上 1/3 杯柄。
     底部之後若同時有多個合法停頓區,優先中段,其次低位,最後上緣
     (prefer_low_over_mid=True 時低位優於中段);同帶內先較緊、再較長、最後才看新近。
+    上緣停頓不得標成「中段 3-C」(band=rim 只標 上緣／杯柄)。
     底部之後若任何高點已高於左高 5% 以上,代表股價早已脫離基底在漲,
     這不是作弊型態(交給 VCP / 高聳旗形 / 交易帳本),避免把飆漲後的
     第一次回檔誤判成「杯柄」而把 pivot 放在最高上影線。
+    底部前 N 根急殺佔整段杯深過大(V 底)也不列作弊。
     """
     if len(c) < 150:
         return None
@@ -499,6 +529,8 @@ def detect_cheat_pattern(o, h, l, c, v, p: PatternParams = PARAMS) -> dict | Non
     base_range = left["price"] - bottom["price"]
     if base_range <= 0:
         return None
+    if _is_v_bottom(h, left, bottom, p):
+        return None
 
     pause = _pause_zone(h, l, c, v, bottom["idx"], p, left=left, bottom=bottom)
     if pause is None:
@@ -510,6 +542,7 @@ def detect_cheat_pattern(o, h, l, c, v, p: PatternParams = PARAMS) -> dict | Non
         pause_mid = (pause["high"] + pause["low"]) / 2
         rel = (pause_mid - bottom["price"]) / base_range  # 0=底部,1=左高
     band = pause.get("band") or _cheat_pause_band(rel, p)
+    # 上緣不得借用中段 3-C 文案;低位 / 中段才是作弊進場標籤
     if band == "low":
         position = CHEAT_POS_LOW
     elif band == "mid":
@@ -706,10 +739,16 @@ DETECTORS = [
     detect_high_tight_flag,
 ]
 
+DETECTOR_BY_PATTERN = {
+    "VCP": detect_vcp,
+    "作弊型態": detect_cheat_pattern,
+    "雙重底": detect_double_bottom,
+    "高聳旗形": detect_high_tight_flag,
+}
 
-def screen_one(ticker: str, ohlcv: dict, meta: dict,
-               p: PatternParams = PARAMS) -> list[dict]:
-    """對單一股票跑所有偵測器,回傳命中的型態 list(已標記 primary)。"""
+
+def series_for_symbol(ohlcv: dict, ticker: str) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series, pd.Series] | None:
+    """從 ohlcv dict 取出單一 ticker 的 O/H/L/C/V;資料不足則 None。"""
     try:
         o = ohlcv["Open"][ticker].dropna()
         h = ohlcv["High"][ticker].dropna()
@@ -717,11 +756,38 @@ def screen_one(ticker: str, ohlcv: dict, meta: dict,
         c = ohlcv["Close"][ticker].dropna()
         v = ohlcv["Volume"][ticker].reindex(c.index).fillna(0)
     except Exception:
-        return []
+        return None
     idx = c.index.intersection(h.index).intersection(l.index)
     if len(idx) < 60:
+        return None
+    o = o.reindex(idx).ffill()
+    h = h.reindex(idx)
+    l = l.reindex(idx)
+    c = c.reindex(idx)
+    v = v.reindex(idx).fillna(0)
+    return o, h, l, c, v
+
+
+def rerun_detector(pattern: str, o: pd.Series, h: pd.Series, l: pd.Series,
+                   c: pd.Series, v: pd.Series,
+                   p: PatternParams = PARAMS) -> dict | None:
+    """以現行參數重跑對應偵測器。帳本復甦／注入前必須通過,失敗則結構無效。"""
+    fn = DETECTOR_BY_PATTERN.get(pattern)
+    if fn is None:
+        return None
+    try:
+        return fn(o, h, l, c, v, p)
+    except Exception:
+        return None
+
+
+def screen_one(ticker: str, ohlcv: dict, meta: dict,
+               p: PatternParams = PARAMS) -> list[dict]:
+    """對單一股票跑所有偵測器,回傳命中的型態 list(已標記 primary)。"""
+    bundle = series_for_symbol(ohlcv, ticker)
+    if bundle is None:
         return []
-    o, h, l, c, v = o.reindex(idx).ffill(), h.reindex(idx), l.reindex(idx), c.reindex(idx), v.reindex(idx).fillna(0)
+    o, h, l, c, v = bundle
 
     hits = []
     for det in DETECTORS:
