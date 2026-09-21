@@ -1,10 +1,10 @@
 {
   "data_date": "2026-09-21",
-  "generated_at": "2026-09-22T02:35:07.331495+08:00",
+  "generated_at": "2026-09-22T02:56:22.539788+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-09-22T02:34:59.110380+08:00",
-  "message": "今日盤未收(台北 02:34),沿用 2026-09-21",
+  "source_checked_at": "2026-09-22T02:56:14.084557+08:00",
+  "message": "今日盤未收(台北 02:56),沿用 2026-09-21",
   "twse_cross_check": {
     "ok": true,
     "reason": "before_session_close",
@@ -22,8 +22,8 @@
   },
   "counts": {
     "rs85": 291,
-    "patterns": 23,
-    "pattern_symbols": 23,
+    "patterns": 22,
+    "pattern_symbols": 22,
     "near_breakout": 9,
     "broke_out": 8,
     "ohlcv_symbols": 71,
