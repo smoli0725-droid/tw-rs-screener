@@ -28,6 +28,10 @@ window.RS_CHART = (() => {
 
   const UP = '#d23b3b';
   const DOWN = '#1f8a4c';
+  // Distinct hues from the pre-lightweight-charts canvas MAs (readable on paper bg).
+  const MA50 = '#f0a202';
+  const MA100 = '#c084fc';
+  const MA200 = '#2dd4bf';
 
   const view = {
     host: null,
@@ -164,8 +168,8 @@ window.RS_CHART = (() => {
   function fillTip(bar) {
     const tip = tipEl();
     if (!tip || !bar) return;
-    const up = bar.close >= bar.open;
-    const cls = up ? 'pnl-up' : 'pnl-down';
+    const cls =
+      bar.close > bar.open ? 'pnl-up' : bar.close < bar.open ? 'pnl-down' : '';
     const px = (n) =>
       Number(n).toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const date = String(bar.time).replaceAll('-', '/');
@@ -258,9 +262,9 @@ window.RS_CHART = (() => {
       wickDownColor: DOWN,
     });
     const maStyle = { priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
-    const ma50 = chart.addLineSeries({ ...maStyle, color: '#222222', lineWidth: 2 });
-    const ma100 = chart.addLineSeries({ ...maStyle, color: '#7a756c', lineWidth: 2 });
-    const ma200 = chart.addLineSeries({ ...maStyle, color: '#b7b1a6', lineWidth: 2 });
+    const ma50 = chart.addLineSeries({ ...maStyle, color: MA50, lineWidth: 2 });
+    const ma100 = chart.addLineSeries({ ...maStyle, color: MA100, lineWidth: 2 });
+    const ma200 = chart.addLineSeries({ ...maStyle, color: MA200, lineWidth: 2 });
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
