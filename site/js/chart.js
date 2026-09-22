@@ -28,6 +28,10 @@ window.RS_CHART = (() => {
 
   const UP = '#d23b3b';
   const DOWN = '#1f8a4c';
+  // Distinct hues from the pre-lightweight-charts canvas MAs (readable on paper bg).
+  const MA50 = '#f0a202';
+  const MA100 = '#c084fc';
+  const MA200 = '#2dd4bf';
 
   const view = {
     host: null,
@@ -43,12 +47,6 @@ window.RS_CHART = (() => {
 
   function labelFor(type) {
     return ANN_LABEL[type] || type;
-  }
-
-  function legendText(ohlcv) {
-    const base = 'MA50 · MA100 · MA200 · 成交量 · 紅漲綠跌';
-    const types = [...new Set((ohlcv.annotations || []).map((a) => labelFor(a.type)))].filter(Boolean);
-    return types.length ? `${base} · 標註 ${types.join('／')}` : base;
   }
 
   function sma(values, period) {
@@ -170,34 +168,25 @@ window.RS_CHART = (() => {
   function fillTip(bar) {
     const tip = tipEl();
     if (!tip || !bar) return;
-    const up = bar.close >= bar.open;
-    const cls = up ? 'pnl-up' : 'pnl-down';
+    const cls =
+      bar.close > bar.open ? 'pnl-up' : bar.close < bar.open ? 'pnl-down' : '';
     const px = (n) =>
       Number(n).toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const date = String(bar.time).replaceAll('-', '/');
-    tip.innerHTML = `<div class="chart-tip-date">${date}</div>
-      <div class="chart-tip-row"><span>開</span><b>${px(bar.open)}</b></div>
-      <div class="chart-tip-row"><span>高</span><b class="${cls}">${px(bar.high)}</b></div>
-      <div class="chart-tip-row"><span>低</span><b class="${cls}">${px(bar.low)}</b></div>
-      <div class="chart-tip-row"><span>收</span><b class="${cls}">${px(bar.close)}</b></div>
-      <div class="chart-tip-row"><span>量</span><b>${lotsLabel(bar.volume)}</b></div>`;
+    tip.innerHTML = `<div class="chart-ohlc-date">${date}</div>
+      <div class="chart-ohlc-row"><span>開</span><b>${px(bar.open)}</b></div>
+      <div class="chart-ohlc-row"><span>高</span><b class="${cls}">${px(bar.high)}</b></div>
+      <div class="chart-ohlc-row"><span>低</span><b class="${cls}">${px(bar.low)}</b></div>
+      <div class="chart-ohlc-row"><span>收</span><b class="${cls}">${px(bar.close)}</b></div>
+      <div class="chart-ohlc-row"><span>量</span><b>${lotsLabel(bar.volume)}</b></div>`;
   }
 
   function placeTip(time) {
     const tip = tipEl();
     const bar = view.byTime.get(time);
-    if (!tip || !bar || !view.chart || !view.series) return;
+    if (!tip || !bar) return;
     fillTip(bar);
-    const x = view.chart.timeScale().timeToCoordinate(time);
-    const y = view.series.priceToCoordinate(bar.high);
-    if (x == null || y == null) {
-      tip.hidden = true;
-      return;
-    }
-    const width = view.host.clientWidth || 320;
     tip.hidden = false;
-    tip.style.left = `${Math.min(Math.max(8, x - 78), Math.max(8, width - 168))}px`;
-    tip.style.top = `${Math.max(8, y + 8)}px`;
   }
 
   function showEmpty(message) {
@@ -273,9 +262,9 @@ window.RS_CHART = (() => {
       wickDownColor: DOWN,
     });
     const maStyle = { priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
-    const ma50 = chart.addLineSeries({ ...maStyle, color: '#222222', lineWidth: 2 });
-    const ma100 = chart.addLineSeries({ ...maStyle, color: '#7a756c', lineWidth: 2 });
-    const ma200 = chart.addLineSeries({ ...maStyle, color: '#b7b1a6', lineWidth: 2 });
+    const ma50 = chart.addLineSeries({ ...maStyle, color: MA50, lineWidth: 2 });
+    const ma100 = chart.addLineSeries({ ...maStyle, color: MA100, lineWidth: 2 });
+    const ma200 = chart.addLineSeries({ ...maStyle, color: MA200, lineWidth: 2 });
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
@@ -428,7 +417,6 @@ window.RS_CHART = (() => {
 
   return {
     draw,
-    legendText,
     labelFor,
     setRange,
     redraw,
