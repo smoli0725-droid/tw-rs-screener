@@ -45,12 +45,6 @@ window.RS_CHART = (() => {
     return ANN_LABEL[type] || type;
   }
 
-  function legendText(ohlcv) {
-    const base = 'MA50 · MA100 · MA200 · 成交量 · 紅漲綠跌';
-    const types = [...new Set((ohlcv.annotations || []).map((a) => labelFor(a.type)))].filter(Boolean);
-    return types.length ? `${base} · 標註 ${types.join('／')}` : base;
-  }
-
   function sma(values, period) {
     const out = new Array(values.length).fill(null);
     if (!period || period < 1) return out;
@@ -175,29 +169,20 @@ window.RS_CHART = (() => {
     const px = (n) =>
       Number(n).toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const date = String(bar.time).replaceAll('-', '/');
-    tip.innerHTML = `<div class="chart-tip-date">${date}</div>
-      <div class="chart-tip-row"><span>開</span><b>${px(bar.open)}</b></div>
-      <div class="chart-tip-row"><span>高</span><b class="${cls}">${px(bar.high)}</b></div>
-      <div class="chart-tip-row"><span>低</span><b class="${cls}">${px(bar.low)}</b></div>
-      <div class="chart-tip-row"><span>收</span><b class="${cls}">${px(bar.close)}</b></div>
-      <div class="chart-tip-row"><span>量</span><b>${lotsLabel(bar.volume)}</b></div>`;
+    tip.innerHTML = `<div class="chart-ohlc-date">${date}</div>
+      <div class="chart-ohlc-row"><span>開</span><b>${px(bar.open)}</b></div>
+      <div class="chart-ohlc-row"><span>高</span><b class="${cls}">${px(bar.high)}</b></div>
+      <div class="chart-ohlc-row"><span>低</span><b class="${cls}">${px(bar.low)}</b></div>
+      <div class="chart-ohlc-row"><span>收</span><b class="${cls}">${px(bar.close)}</b></div>
+      <div class="chart-ohlc-row"><span>量</span><b>${lotsLabel(bar.volume)}</b></div>`;
   }
 
   function placeTip(time) {
     const tip = tipEl();
     const bar = view.byTime.get(time);
-    if (!tip || !bar || !view.chart || !view.series) return;
+    if (!tip || !bar) return;
     fillTip(bar);
-    const x = view.chart.timeScale().timeToCoordinate(time);
-    const y = view.series.priceToCoordinate(bar.high);
-    if (x == null || y == null) {
-      tip.hidden = true;
-      return;
-    }
-    const width = view.host.clientWidth || 320;
     tip.hidden = false;
-    tip.style.left = `${Math.min(Math.max(8, x - 78), Math.max(8, width - 168))}px`;
-    tip.style.top = `${Math.max(8, y + 8)}px`;
   }
 
   function showEmpty(message) {
@@ -428,7 +413,6 @@ window.RS_CHART = (() => {
 
   return {
     draw,
-    legendText,
     labelFor,
     setRange,
     redraw,

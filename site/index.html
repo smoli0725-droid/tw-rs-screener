@@ -65,13 +65,6 @@
       <button class="side-link" data-view="teaching" type="button"><span class="nav-icon" aria-hidden="true">✎</span><span class="side-label">教學</span></button>
       <button class="side-link" data-view="settings" type="button"><span class="nav-icon" aria-hidden="true">⚙</span><span class="side-label">設定</span></button>
     </nav>
-    <div class="demo-badge demo-badge-side" hidden>
-      <span class="demo-badge-mark">示</span>
-      <div class="demo-badge-text">
-        <div>示範帳號</div>
-        <div class="hint">示例資料 · 非真實</div>
-      </div>
-    </div>
   </aside>
   <div class="app-main">
   <header class="topbar">
@@ -128,14 +121,7 @@
         </div>
       </div>
       <div id="positionList" class="list"></div>
-      <div class="demo-badge demo-badge-mobile" hidden>
-        <span class="demo-badge-mark">示</span>
-        <div class="demo-badge-text">
-          <div>示範帳號</div>
-          <div class="hint">示例資料 · 非真實</div>
-        </div>
-      </div>
-      <p class="hint">有手記之後會改顯示你的雲端持股（本機 localStorage 僅作快取）。空的日誌先顯示示例，方便對照版面。</p>
+      <p class="hint">持股與績效來自你的手記（本機 localStorage 僅作快取；登入後可同步雲端）。</p>
     </section>
 
     <section id="view-recommend" class="view">
@@ -361,9 +347,12 @@
         <div class="chart-head-main">
           <h2 id="chartTitle">—</h2>
           <div id="chartSub" class="meta-line"></div>
-          <div class="chart-last">
-            <span id="chartLast" class="chart-last-px">—</span>
-            <span id="chartChg" class="chart-chg"></span>
+          <div class="chart-head-quote">
+            <div class="chart-last">
+              <span id="chartLast" class="chart-last-px">—</span>
+              <span id="chartChg" class="chart-chg"></span>
+            </div>
+            <div id="chartTip" class="chart-ohlc" hidden></div>
           </div>
         </div>
       </div>
@@ -374,18 +363,18 @@
           <button class="chip" data-range="W" type="button">週</button>
           <button class="chip" data-range="M" type="button">月</button>
         </div>
+      </div>
+      <div class="chart-stage">
+        <div id="chartHost"></div>
+      </div>
+      <div class="chart-footer">
         <div class="ma-legend" id="chartMaLegend">
           <span><i class="ma-swatch ma50"></i>MA50</span>
           <span><i class="ma-swatch ma100"></i>MA100</span>
           <span><i class="ma-swatch ma200"></i>MA200</span>
         </div>
+        <div id="chartLegend" class="chart-legend"></div>
       </div>
-      <div class="chart-stage">
-        <div id="chartHost"></div>
-        <div id="chartTip" class="chart-tip" hidden></div>
-      </div>
-      <div id="chartLegend" class="chart-legend"></div>
-      <p class="hint chart-tap-hint">點一根 K 可看該日數據</p>
       <button id="addFromChartBtn" class="primary-btn" type="button">加入持股</button>
     </div>
   </dialog>

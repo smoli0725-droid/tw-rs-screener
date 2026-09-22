@@ -159,15 +159,7 @@
   }
 
   function viewJournal() {
-    const real = RS_STORAGE.loadTrades();
-    if (real.length || !window.RS_PREVIEW) {
-      return { trades: real, prices: state.priceMap, sample: false };
-    }
-    return {
-      trades: RS_PREVIEW.demoTrades(),
-      prices: RS_PREVIEW.demoPrices(),
-      sample: true,
-    };
+    return { trades: RS_STORAGE.loadTrades(), prices: state.priceMap, sample: false };
   }
 
   function curveMarkup(points) {
@@ -191,12 +183,12 @@
     return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="已實現損益成長曲線"><path d="${area}" fill="rgba(28,28,28,0.08)"></path><path d="${line}" fill="none" stroke="#1c1c1c" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path></svg>`;
   }
 
-  function renderMetricCards(metrics, sample) {
+  function renderMetricCards(metrics) {
     const win = $('#metricWinRate');
     if (!win) return;
     win.textContent = metrics.winRate == null ? '—' : `${Math.round(metrics.winRate * 100)}%`;
     $('#metricWinRateNote').textContent = metrics.closedCount
-      ? `近 ${metrics.closedCount} 筆手記平倉${sample ? ' · 示例資料' : ''}`
+      ? `近 ${metrics.closedCount} 筆手記平倉`
       : '尚無手記平倉';
     const winAvg = $('#metricWinAvg');
     winAvg.textContent = formatPct1(metrics.winningAvgReturnPct);
@@ -204,9 +196,9 @@
     const month = $('#metricMonth');
     month.textContent = formatPct1(metrics.monthReturnPct);
     month.className = `metric-value ${fmt.pnlClass(metrics.monthReturnPct || 0)}`;
-    $('#metricMonthNote').textContent = `${formatMonthLabel(metrics.monthKey)}${sample ? ' · 示例資料' : ' · 已實現'}`;
+    $('#metricMonthNote').textContent = `${formatMonthLabel(metrics.monthKey)} · 已實現`;
     $('#metricCurve').innerHTML = curveMarkup(metrics.realizedCurve);
-    $('#metricCurveNote').textContent = sample ? '累計已實現 · 示例資料' : '累計已實現';
+    $('#metricCurveNote').textContent = '累計已實現';
   }
 
   function renderPortfolio() {
@@ -218,42 +210,26 @@
     const cost = positions.reduce((s, p) => s + p.costValue, 0);
     $('#totalMv').textContent = mv.toLocaleString('zh-TW', { maximumFractionDigits: 0 });
     const pnlEl = $('#totalPnl');
-    if (journal.sample) {
-      pnlEl.textContent = '';
-      pnlEl.className = 'summary-sub';
-    } else {
-      pnlEl.textContent = positions.length
-        ? `未實現 ${fmt.money(pnl)}（${fmt.pct(cost ? pnl / cost : 0)}）`
-        : '未實現 —';
-      pnlEl.className = `summary-sub ${fmt.pnlClass(pnl)}`;
-    }
+    pnlEl.textContent = positions.length
+      ? `未實現 ${fmt.money(pnl)}（${fmt.pct(cost ? pnl / cost : 0)}）`
+      : '未實現 —';
+    pnlEl.className = `summary-sub ${fmt.pnlClass(pnl)}`;
     const note = $('#portfolioNote');
     if (note) {
-      note.textContent = journal.sample
-        ? '示例資料 · 下列數字皆為靜態示意，不代表真實損益或帳戶'
-        : '勝率與成功單報酬只計你手記的平倉，不含系統突破帳本。';
+      note.textContent = '勝率與成功單報酬只計你手記的平倉，不含系統突破帳本。';
     }
-    $$('.demo-badge').forEach((el) => {
-      el.hidden = !journal.sample;
-    });
-    renderMetricCards(metrics, journal.sample);
+    renderMetricCards(metrics);
 
     const list = $('#positionList');
     if (!positions.length) {
-      list.innerHTML = '<div class="empty">尚未有持股，點上方新增</div>';
+      list.innerHTML = '<div class="empty">尚未有持股，點上方「新增持股」</div>';
       return;
     }
     list.innerHTML = `<div class="holdings-table-wrap"><table class="holdings-table"><thead><tr>
-        <th>標的</th><th>股數</th><th>成本</th><th>現價</th><th>報酬</th>${journal.sample ? '' : '<th></th>'}
+        <th>標的</th><th>股數</th><th>成本</th><th>現價</th><th>報酬</th><th></th>
       </tr></thead><tbody>${positions
         .map((p) => {
           const quote = p.lastPrice == null ? '暫用成本' : formatPx(p.lastPrice);
-          const rowActions = journal.sample
-            ? ''
-            : `<td class="holding-actions">
-                <button type="button" class="ghost-btn" data-sell="${p.symbol}">賣出</button>
-                <button type="button" class="ghost-btn" data-delete-pos="${p.symbol}" data-name="${esc(p.name)}">刪除</button>
-              </td>`;
           return `<tr class="holding-row" data-open-chart="${p.symbol}" data-name="${esc(p.name)}" data-market="${esc(p.market)}">
             <td class="holding-name">${p.symbol} ${esc(p.name)}${
               p.lastPrice == null ? '<span class="badge warn">無報價</span>' : ''
@@ -262,7 +238,10 @@
             <td>${formatPx(p.cost)}</td>
             <td>${quote}</td>
             <td class="${fmt.pnlClass(p.returnPct)}">${formatPct1(p.returnPct)}</td>
-            ${rowActions}
+            <td class="holding-actions">
+              <button type="button" class="ghost-btn" data-sell="${p.symbol}">賣出</button>
+              <button type="button" class="ghost-btn" data-delete-pos="${p.symbol}" data-name="${esc(p.name)}">刪除</button>
+            </td>
           </tr>`;
         })
         .join('')}</tbody></table></div>`;
@@ -457,7 +436,8 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     state.chartOhlcv = ohlcv;
     state.chartSample = sample;
     const summary = RS_CHART.draw($('#chartHost'), ohlcv, pivot);
-    $('#chartLegend').textContent = RS_CHART.legendText(ohlcv);
+    const legend = $('#chartLegend');
+    if (legend) legend.textContent = '';
     applyChartSummary(summary, sample, pivot);
   }
 
@@ -729,7 +709,7 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     const positions = RS_PORTFOLIO.buildPositions(journal.trades, journal.prices);
     const m = RS_PORTFOLIO.computeMetrics(journal.trades, positions);
     $('#metricsBody').innerHTML = `
-      <p class="hint">${journal.sample ? '示例資料。' : ''}勝率與成功單平均報酬只計手記平倉（FIFO，賺錢的單另計），不含系統突破帳本。</p>
+      <p class="hint">勝率與成功單平均報酬只計手記平倉（FIFO，賺錢的單另計），不含系統突破帳本。</p>
       <p>勝率：<strong>${m.winRate == null ? '—' : fmt.pct(m.winRate)}</strong>
         <span class="hint">（${
           m.closedCount ? `已平倉 ${m.closedCount} 筆` : '尚無手記平倉'
