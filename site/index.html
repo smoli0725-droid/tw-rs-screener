@@ -215,6 +215,15 @@
         <h3>帳號</h3>
         <div id="accountBody" class="hint">載入中…</div>
       </div>
+      <div class="card" id="pushCard">
+        <h3>到價推播</h3>
+        <p class="hint">開啟後，白名單電腦確認到價時會用瀏覽器通知你。本站只看行情，不會下單。iPhone 需先用 Safari「加入主畫面」。</p>
+        <div id="pushStatus" class="hint">載入中…</div>
+        <div class="row-actions">
+          <button id="enablePushBtn" class="primary-btn" type="button">開啟推播</button>
+          <button id="disablePushBtn" class="ghost-btn" type="button" hidden>關閉推播</button>
+        </div>
+      </div>
       <div class="card" id="dataStatusCard">
         <h3>資料狀態</h3>
         <div id="dataStatusBody" class="hint">載入中…</div>
@@ -393,6 +402,7 @@
   <script src="js/chart.js"></script>
   <script src="js/teaching.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/push.js"></script>
   <script src="js/auth.js"></script>
 </body>
 </html>

@@ -100,7 +100,8 @@ jobs:
           wranglerVersion: "3.99.0"
           command: pages project create tradingvenator --production-branch=main
 
-      # Schema already applied via dashboard/MCP; token may lack D1 Edit — don't block Pages deploy
+      # Schema already applied via dashboard/MCP; token may lack D1 Edit — don't block Pages deploy.
+      # Push secrets are optional: this job does not read VAPID_* or ALERT_PUSH_SECRET.
       - name: Apply D1 schema
         if: env.D1_DATABASE_ID != ''
         continue-on-error: true
@@ -110,6 +111,16 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "3.99.0"
           command: d1 execute tradingvenator --remote --file=migrations/0001_init.sql --yes
+
+      - name: Apply push subscription schema
+        if: env.D1_DATABASE_ID != ''
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "3.99.0"
+          command: d1 execute tradingvenator --remote --file=migrations/0002_push_subscriptions.sql --yes
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

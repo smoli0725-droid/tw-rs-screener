@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Cloudflare Pages Functions for TradingVenator auth + user data API",
   "dependencies": {
-    "@clerk/backend": "^2.19.0"
+    "@clerk/backend": "^2.19.0",
+    "web-push-neo": "^0.1.2"
   }
 }

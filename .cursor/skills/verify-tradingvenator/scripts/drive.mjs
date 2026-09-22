@@ -202,6 +202,8 @@ async function snapshotDom(page) {
       totalMv: pack('#totalMv'),
       dataBaseUrl: document.querySelector('#dataBaseUrl')?.value || null,
       dataStatusBody: pack('#dataStatusBody'),
+      pushCard: pack('#pushCard'),
+      pushStatus: pack('#pushStatus'),
       accountBody: pack('#accountBody'),
       teachingList: pack('#teachingList'),
       teachingListPane: pack('#teachingListPane'),
@@ -433,13 +435,29 @@ async function driveSettings(page, outDir) {
   const shot = await saveEvidence(outDir, '01-settings', page);
   const url = shot.snap.dataBaseUrl;
   assert(url != null, '#dataBaseUrl missing');
+  await page.locator('#pushCard').scrollIntoViewIfNeeded();
+  const pushText = await page.locator('#pushCard').innerText();
+  assert(/到價推播/.test(pushText), `settings missing 到價推播: ${pushText.slice(0, 180)}`);
+  assert(/不會下單/.test(pushText), 'push card should say the site does not place orders');
+  await page.locator('#enablePushBtn').click();
+  await page.waitForFunction(() => {
+    const t = document.querySelector('#pushStatus')?.textContent || '';
+    return t && !t.includes('載入中');
+  });
+  const after = await saveEvidence(outDir, '02-push', page);
+  const status = after.snap.pushStatus?.text || '';
+  assert(
+    /請先登入|不支援|尚未允許|尚未設定|已開啟|封鎖|加入主畫面/.test(status),
+    `unexpected push status: ${status}`
+  );
   return {
     ok: true,
     feature: 'settings',
     dataBaseUrl: url,
     dataStatus: shot.snap.dataStatusBody?.text,
-    proof: ['01-settings.png'],
-    note: 'Read-only by default. Saving a new URL mutates localStorage (and D1 when signed in).',
+    pushStatus: status,
+    proof: ['01-settings.png', '02-push.png'],
+    note: 'Read-only by default. Enable-push under --bypass-auth stops at 請先登入 and does not request Notification permission.',
   };
 }
 

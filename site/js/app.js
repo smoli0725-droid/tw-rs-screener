@@ -55,12 +55,12 @@
       .replaceAll('"', '&quot;');
   }
 
-  function toast(msg) {
+  function toast(msg, duration) {
     const el = document.createElement('div');
     el.className = 'toast';
     el.textContent = msg;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 2200);
+    setTimeout(() => el.remove(), duration || 2200);
   }
 
   async function refresh() {
@@ -489,6 +489,7 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
   function showView(view, opts = {}) {
     $$('.nav-item, .side-link').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
     $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
+    if (view === 'settings' && window.RS_PUSH) RS_PUSH.refresh();
     if (view === 'teaching' && window.RS_TEACHING) {
       if (opts.hash) RS_TEACHING.openFromHash(opts.hash);
       else RS_TEACHING.onViewShown();
@@ -863,6 +864,10 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
       const input = $('#dataBaseUrl');
       if (input) input.value = RS_STORAGE.getDataBaseUrl();
       renderAccount();
+      if (window.RS_PUSH) {
+        RS_PUSH.bind();
+        await RS_PUSH.refresh();
+      }
       if (window.RS_TEACHING) {
         RS_TEACHING.bind();
         await RS_TEACHING.load();

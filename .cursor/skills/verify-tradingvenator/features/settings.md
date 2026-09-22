@@ -8,6 +8,7 @@
 - `settings-url` shows `#dataBaseUrl` with `./data` on a fresh profile (or the persisted URL).
 - `settings-status` fills `#dataStatusBody` with 資料日期 and 新鮮度 after load.
 - `settings-refresh` header **↻** reloads without changing the URL.
+- `settings-push` shows `#pushCard`（到價推播）. **開啟推播** needs a Clerk session and Pages VAPID secrets. Under `--bypass-auth` the status becomes `請先登入再開啟推播` and does not prompt for notification permission.
 
 ## How to get to it (user POV)
 
@@ -25,7 +26,7 @@ Preconditions:
 - **Open settings.** Choose 設定. Run `node .cursor/skills/verify-tradingvenator/scripts/drive.mjs --feature settings --bypass-auth`. `#view-settings` is `.active`. `#dataBaseUrl` is visible.
 - **Read URL.** `#dataBaseUrl` value is `./data` (or `/data` / `data` only if someone persisted that). `#dataStatusBody` contains `資料日期` after `RS_APP.start`.
 - **Refresh only.** Prefer `#refreshBtn` over save. After refresh, `#metaLine` still contains `資料` and is not stuck on `載入資料中…`.
-- **Proof.** `artifacts/settings/01-settings.png` shows 設定, `#aboutCard` 閃電選股 · FlashPick, the textarea, and data status. `01-settings.snapshot.json` records `dataBaseUrl`. `result.json` `ok: true`.
+- **Proof.** `artifacts/settings/01-settings.png` shows 設定, `#aboutCard` 閃電選股 · FlashPick, the textarea, and data status. `02-push.png` shows `#pushCard` after scrolling to 到價推播 and clicking 開啟推播. `01-settings.snapshot.json` records `dataBaseUrl`. `result.json` `ok: true`.
 
 ## Gotchas
 
