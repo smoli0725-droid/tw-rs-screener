@@ -3,8 +3,8 @@
   "short_name": "閃電選股",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f4f7f5",
-  "theme_color": "#0b3d4a",
+  "background_color": "#f4f3ef",
+  "theme_color": "#f4f3ef",
   "lang": "zh-Hant",
   "icons": [
     {

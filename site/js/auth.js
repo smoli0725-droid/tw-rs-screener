@@ -149,10 +149,10 @@ window.RS_AUTH = (() => {
       routing: 'hash',
       appearance: {
         variables: {
-          colorPrimary: '#0f7a6c',
-          colorText: '#0b3d4a',
-          colorBackground: '#ffffff',
-          borderRadius: '12px',
+          colorPrimary: '#1c1c1c',
+          colorText: '#1c1c1c',
+          colorBackground: '#fbfaf7',
+          borderRadius: '8px',
         },
       },
     });
@@ -166,8 +166,8 @@ window.RS_AUTH = (() => {
         afterSignOutUrl: '/',
         appearance: {
           variables: {
-            colorPrimary: '#0f7a6c',
-            colorText: '#0b3d4a',
+            colorPrimary: '#1c1c1c',
+            colorText: '#1c1c1c',
           },
         },
       });
@@ -218,9 +218,9 @@ window.RS_AUTH = (() => {
       await clerk.load({
         appearance: {
           variables: {
-            colorPrimary: '#0f7a6c',
-            colorText: '#0b3d4a',
-            borderRadius: '12px',
+            colorPrimary: '#1c1c1c',
+            colorText: '#1c1c1c',
+            borderRadius: '8px',
           },
         },
       });
