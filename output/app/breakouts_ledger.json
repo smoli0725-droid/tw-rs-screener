@@ -251,8 +251,8 @@
    "outcome_pct": -9.66,
    "peak_close": 88.0,
    "trough_close": 79.5,
-   "last_date": "2026-09-22",
-   "last_close": 72.4
+   "last_date": "2026-09-21",
+   "last_close": 73.5
   },
   {
    "trade_id": "3094-2026-08-28-39",
@@ -527,8 +527,8 @@
    "outcome_pct": -7.31,
    "peak_close": 81.4,
    "trough_close": 72.3,
-   "last_date": "2026-09-22",
-   "last_close": 70.9
+   "last_date": "2026-09-21",
+   "last_close": 69.7
   },
   {
    "trade_id": "3406-2026-09-04-1055",
@@ -803,8 +803,8 @@
    "outcome_pct": -5.16,
    "peak_close": 26.85,
    "trough_close": 23.9,
-   "last_date": "2026-09-22",
-   "last_close": 24.1
+   "last_date": "2026-09-21",
+   "last_close": 24.45
   },
   {
    "trade_id": "3406-2026-09-09-1055",
@@ -872,8 +872,8 @@
    "outcome_pct": -7.44,
    "peak_close": 566.0,
    "trough_close": 510.0,
-   "last_date": "2026-09-22",
-   "last_close": 538.0
+   "last_date": "2026-09-21",
+   "last_close": 548.0
   },
   {
    "trade_id": "3711-2026-09-09-628",
@@ -941,7 +941,7 @@
    "outcome_pct": -5.86,
    "peak_close": 223.5,
    "trough_close": 209.0,
-   "last_date": "2026-09-22",
+   "last_date": "2026-09-21",
    "last_close": 218.0
   },
   {
@@ -964,8 +964,8 @@
    "outcome_pct": -5.47,
    "peak_close": 27.9,
    "trough_close": 24.2,
-   "last_date": "2026-09-22",
-   "last_close": 24.45
+   "last_date": "2026-09-21",
+   "last_close": 24.9
   },
   {
    "trade_id": "6196-2026-09-09-528",
@@ -1003,15 +1003,15 @@
    "breakout_date": "2026-09-09",
    "breakout_close": 999.0,
    "origin": "pattern",
-   "status": "failed",
+   "status": "recovered",
    "outcome": "failed",
    "outcome_date": "2026-09-15",
    "outcome_close": 890.0,
    "outcome_pct": -10.55,
    "peak_close": 1030.0,
    "trough_close": 890.0,
-   "last_date": "2026-09-22",
-   "last_close": 934.0
+   "last_date": "2026-09-21",
+   "last_close": 948.0
   },
   {
    "trade_id": "6933-2026-09-09-331",
@@ -1647,15 +1647,15 @@
    "breakout_date": "2026-09-18",
    "breakout_close": 243.5,
    "origin": "recovered",
-   "status": "failed",
+   "status": "recovered",
    "outcome": "failed",
    "outcome_date": "2026-09-22",
    "outcome_close": 222.5,
    "outcome_pct": -7.87,
    "peak_close": 243.5,
    "trough_close": 222.5,
-   "last_date": "2026-09-22",
-   "last_close": 222.5
+   "last_date": "2026-09-21",
+   "last_close": 232.0
   },
   {
    "trade_id": "6538-2026-09-18-388",
@@ -2002,7 +2002,7 @@
   "wins": 19,
   "losses": 14,
   "pending": 33,
-  "recovered": 4,
+  "recovered": 6,
   "win_rate": 0.576,
   "label": "市況中性",
   "rules": {
