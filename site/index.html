@@ -50,6 +50,30 @@
   </div>
 
   <div class="app-shell">
+  <aside id="appSidebar" class="app-sidebar">
+    <div class="side-brand">
+      <img class="brand-mark" src="icons/icon-192.png?v=20260916" width="36" height="36" alt="" />
+      <div class="side-brand-text">
+        <div class="brand-title">閃電選股</div>
+        <div class="brand-en">FlashPick</div>
+      </div>
+      <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-expanded="true" aria-label="收合側欄">‹</button>
+    </div>
+    <nav class="side-nav" aria-label="主要">
+      <button class="side-link active" data-view="portfolio" type="button"><span class="nav-icon" aria-hidden="true">▣</span><span class="side-label">持股</span></button>
+      <button class="side-link" data-view="recommend" type="button"><span class="nav-icon" aria-hidden="true">◈</span><span class="side-label">推薦</span></button>
+      <button class="side-link" data-view="teaching" type="button"><span class="nav-icon" aria-hidden="true">✎</span><span class="side-label">教學</span></button>
+      <button class="side-link" data-view="settings" type="button"><span class="nav-icon" aria-hidden="true">⚙</span><span class="side-label">設定</span></button>
+    </nav>
+    <div class="demo-badge demo-badge-side" hidden>
+      <span class="demo-badge-mark">示</span>
+      <div class="demo-badge-text">
+        <div>示範帳號</div>
+        <div class="hint">示例資料 · 非真實</div>
+      </div>
+    </div>
+  </aside>
+  <div class="app-main">
   <header class="topbar">
     <div class="brand">
       <img class="brand-mark" src="icons/icon-192.png?v=20260916" width="42" height="42" alt="閃電選股" />
@@ -69,17 +93,49 @@
 
   <main>
     <section id="view-portfolio" class="view active">
-      <div class="card summary">
-        <div class="summary-label">總市值</div>
-        <div id="totalMv" class="summary-value">—</div>
-        <div id="totalPnl" class="summary-sub">損益 —</div>
+      <div class="pf-kicker">持股</div>
+      <div class="pf-mv-label">總市值 NT$</div>
+      <div id="totalMv" class="summary-value">—</div>
+      <div id="totalPnl" class="summary-sub"></div>
+      <p id="portfolioNote" class="hint"></p>
+      <div class="metric-grid" id="metricGrid">
+        <article class="metric-card">
+          <div class="metric-label">勝率</div>
+          <div id="metricWinRate" class="metric-value">—</div>
+          <div id="metricWinRateNote" class="metric-note"></div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label">成功單平均報酬</div>
+          <div id="metricWinAvg" class="metric-value">—</div>
+          <div class="metric-note">僅計你手記且賺錢的平倉，不含系統突破帳本</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label">月報酬率</div>
+          <div id="metricMonth" class="metric-value">—</div>
+          <div id="metricMonthNote" class="metric-note"></div>
+        </article>
+        <article class="metric-card metric-card-curve">
+          <div class="metric-label">已實現損益成長曲線</div>
+          <div id="metricCurve" class="metric-curve"></div>
+          <div id="metricCurveNote" class="metric-note"></div>
+        </article>
       </div>
-      <div class="row-actions">
-        <button id="addTradeBtn" class="primary-btn" type="button">＋ 新增持股</button>
-        <button id="metricsBtn" class="ghost-btn" type="button">績效</button>
+      <div class="holdings-head">
+        <h2>持股明細</h2>
+        <div class="row-actions">
+          <button id="metricsBtn" class="ghost-btn" type="button">績效</button>
+          <button id="addTradeBtn" class="primary-btn" type="button">＋ 新增持股</button>
+        </div>
       </div>
       <div id="positionList" class="list"></div>
-      <p class="hint">持股會同步到雲端（本機 localStorage 僅作快取）。</p>
+      <div class="demo-badge demo-badge-mobile" hidden>
+        <span class="demo-badge-mark">示</span>
+        <div class="demo-badge-text">
+          <div>示範帳號</div>
+          <div class="hint">示例資料 · 非真實</div>
+        </div>
+      </div>
+      <p class="hint">有手記之後會改顯示你的雲端持股（本機 localStorage 僅作快取）。空的日誌先顯示示例，方便對照版面。</p>
     </section>
 
     <section id="view-recommend" class="view">
@@ -189,6 +245,7 @@
     <button class="nav-item" data-view="teaching" type="button"><span class="nav-icon">✎</span>教學</button>
     <button class="nav-item" data-view="settings" type="button"><span class="nav-icon">⚙</span>設定</button>
   </nav>
+  </div>
 
   <dialog id="tradeDialog">
     <form method="dialog" id="tradeForm" class="dialog-body">
@@ -291,24 +348,47 @@
   <dialog id="chartDialog" class="chart-dialog">
     <div class="dialog-body chart-body">
       <div class="chart-head">
-        <div>
+        <button id="closeChartBtn" class="chart-back ghost-btn" type="button" aria-label="關閉">‹ 關閉</button>
+        <div class="chart-head-main">
           <h2 id="chartTitle">—</h2>
           <div id="chartSub" class="meta-line"></div>
+          <div class="chart-last">
+            <span id="chartLast" class="chart-last-px">—</span>
+            <span id="chartChg" class="chart-chg"></span>
+          </div>
         </div>
-        <button id="closeChartBtn" class="ghost-btn" type="button">關閉</button>
       </div>
-      <canvas id="chartCanvas"></canvas>
+      <div class="chart-toolbar">
+        <div id="chartRanges" class="chips">
+          <button class="chip" data-range="I" type="button">分</button>
+          <button class="chip active" data-range="D" type="button">日</button>
+          <button class="chip" data-range="W" type="button">週</button>
+          <button class="chip" data-range="M" type="button">月</button>
+        </div>
+        <div class="ma-legend" id="chartMaLegend">
+          <span><i class="ma-swatch ma50"></i>MA50</span>
+          <span><i class="ma-swatch ma100"></i>MA100</span>
+          <span><i class="ma-swatch ma200"></i>MA200</span>
+        </div>
+      </div>
+      <div class="chart-stage">
+        <div id="chartHost"></div>
+        <div id="chartTip" class="chart-tip" hidden></div>
+      </div>
       <div id="chartLegend" class="chart-legend"></div>
+      <p class="hint chart-tap-hint">點一根 K 可看該日數據</p>
       <button id="addFromChartBtn" class="primary-btn" type="button">加入持股</button>
     </div>
   </dialog>
 
   </div>
 
+  <script src="vendor/lightweight-charts.standalone.production.js"></script>
   <script src="js/config.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/api.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/preview-demo.js"></script>
   <script src="js/portfolio.js"></script>
   <script src="js/chart.js"></script>
   <script src="js/teaching.js"></script>

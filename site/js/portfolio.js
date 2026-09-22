@@ -43,7 +43,20 @@ window.RS_PORTFOLIO = (() => {
       .sort((a, b) => a.symbol.localeCompare(b.symbol));
   }
 
-  function computeMetrics(trades, positions) {
+  function taipeiYearMonth(date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: '2-digit',
+    }).formatToParts(date);
+    const year = parts.find((p) => p.type === 'year').value;
+    const month = parts.find((p) => p.type === 'month').value;
+    return `${year}-${month}`;
+  }
+
+  // Closed lots come only from the trades argument (the user journal).
+  // The system breakout ledger is never read here.
+  function computeMetrics(trades, positions, now = new Date()) {
     const sorted = [...trades].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const buys = {};
     const closed = [];
@@ -70,13 +83,16 @@ window.RS_PORTFOLIO = (() => {
       }
     }
 
+    const winners = closed.filter((c) => c.pnl > 0);
     let winRate = null;
     let avgReturnPct = null;
+    let winningAvgReturnPct = null;
     if (closed.length) {
-      winRate = closed.filter((c) => c.pnl > 0).length / closed.length;
+      winRate = winners.length / closed.length;
       avgReturnPct = closed.reduce((s, c) => s + c.returnPct, 0) / closed.length;
-    } else if (positions.length) {
-      winRate = positions.filter((p) => p.pnl > 0).length / positions.length;
+    }
+    if (winners.length) {
+      winningAvgReturnPct = winners.reduce((s, c) => s + c.returnPct, 0) / winners.length;
     }
 
     const avgOpenReturnPct = positions.length
@@ -106,13 +122,27 @@ window.RS_PORTFOLIO = (() => {
     const openCost = positions.reduce((s, p) => s + p.costValue, 0);
     const unrealizedReturnPct = openCost > 0 ? unrealizedPnl / openCost : null;
 
+    const monthKey = taipeiYearMonth(now instanceof Date ? now : new Date(now));
+    const monthRow = monthly.find((row) => row.yearMonth === monthKey) || null;
+    let accPnl = 0;
+    const realizedCurve = closed.map((c) => {
+      accPnl += c.pnl;
+      return { date: String(c.sellDate).slice(0, 10), pnl: accPnl };
+    });
+
     return {
       winRate,
       avgReturnPct,
+      winningAvgReturnPct,
+      winningCount: winners.length,
       avgOpenReturnPct,
       closedCount: closed.length,
       openCount: positions.length,
       monthly,
+      monthKey,
+      monthReturnPct: monthRow ? monthRow.returnPct : null,
+      monthPnl: monthRow ? monthRow.pnl : null,
+      realizedCurve,
       unrealizedPnl,
       openCost,
       unrealizedReturnPct,

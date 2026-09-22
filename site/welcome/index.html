@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>閃電選股 · FlashPick</title>
+  <meta name="description" content="用 RS 與型態選出台股強勢股。公開預覽頁，登入後才進入持股與掃描。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="welcome.css" />
+  <link rel="icon" href="../favicon.ico?v=20260916" sizes="any" />
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="./">
+      <svg class="bolt" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+      <span>閃電選股</span>
+      <span class="brand-en">FlashPick</span>
+    </a>
+    <nav class="links" aria-label="公開">
+      <a href="#sample">產品</a>
+      <a href="../?signin=1">教學</a>
+      <a href="../?signin=1">登入</a>
+      <a class="btn btn-dark" href="../?signin=1">開始使用</a>
+    </nav>
+  </header>
+
+  <main class="hero">
+    <div>
+      <p class="eyebrow">台股 · 相對強度 · 價格型態</p>
+      <h1>用 RS 與型態<br />選出台股強勢股</h1>
+      <p class="lead">FlashPick 閃電選股每天掃描上市櫃相對強度與杯柄、突破、盤整等型態，把時間留給真正值得打開 K 線的標的。</p>
+      <div class="ctas">
+        <a class="btn btn-dark" href="../?signin=1">登入</a>
+        <a class="btn btn-light" href="#sample">看範例</a>
+      </div>
+      <p class="fine">公開入口 · 登入前畫面 · 右側為產品示意，非正式交易畫面</p>
+    </div>
+
+    <section id="sample" class="window" aria-label="今日掃描示例">
+      <div class="window-bar">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="window-title">今日掃描 · 日線</span>
+        <span class="pill">示例資料</span>
+      </div>
+      <div class="filters" aria-hidden="true">
+        <span class="chip">上市櫃</span>
+        <span class="chip">RS ≥ 80</span>
+        <span class="chip">型態：全部</span>
+      </div>
+      <table>
+        <thead>
+          <tr><th>標的</th><th>RS</th><th>型態</th><th>日漲跌</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="name">2330 台積電</td><td>94</td><td>杯柄</td><td class="up">+1.4%</td></tr>
+          <tr><td class="name">2454 聯發科</td><td>91</td><td>突破</td><td class="up">+2.1%</td></tr>
+          <tr><td class="name">2317 鴻海</td><td>86</td><td>盤整</td><td class="down">−0.3%</td></tr>
+          <tr><td class="name">2382 廣達</td><td>84</td><td>高位停頓</td><td class="up">+0.8%</td></tr>
+          <tr><td class="name">6669 緯穎</td><td>82</td><td>杯底</td><td class="up">+1.1%</td></tr>
+          <tr><td class="name">3231 緯創</td><td>80</td><td>突破回測</td><td class="down">−0.6%</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div>每日掃描 · RS 排名 · 型態標註</div>
+    <div>閃電選股 FlashPick · 靜態原型 v1 · 非真實報價</div>
+  </footer>
+</body>
+</html>
