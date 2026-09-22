@@ -147,7 +147,14 @@ main { max-width: 880px; margin: 0 auto; padding: 14px 16px 20px; }
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
 }
 .nav-item.active { color: var(--ink); }
-.nav-icon { font-size: 1.05rem; }
+.nav-icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.nav-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+  display: block;
+  color: inherit;
+}
 dialog {
   border: 1px solid var(--line); border-radius: 12px; padding: 0;
   width: min(520px, calc(100vw - 24px));
@@ -446,6 +453,8 @@ body.signed-out .auth-gate { display: flex; }
   body.sidebar-collapsed .app-sidebar { width: 84px; }
   body.sidebar-collapsed .side-label,
   body.sidebar-collapsed .side-brand-text { display: none; }
+  body.sidebar-collapsed .side-link { justify-content: center; padding-left: 10px; padding-right: 10px; }
+  body.sidebar-collapsed .side-brand { justify-content: center; }
   .app-main {
     flex: 1;
     min-width: 0;
