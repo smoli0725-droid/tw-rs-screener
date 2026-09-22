@@ -22,3 +22,7 @@ bucket_name = "flashpick-teaching"
 
 [vars]
 CLERK_PUBLISHABLE_KEY = "__CLERK_PUBLISHABLE_KEY__"
+
+# Optional Pages secrets (do not put values here):
+# VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, ALERT_PUSH_SECRET, VAPID_SUBJECT.
+# If they are unset, web push stays disabled and the rest of the site still deploys.

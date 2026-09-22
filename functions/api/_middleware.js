@@ -1,6 +1,12 @@
 import { requireUser } from '../_lib/auth.js';
 import { isAllowedOrigin, json, withCors } from '../_lib/cors.js';
 
+function isWatcherPush(request) {
+  if (request.method !== 'POST') return false;
+  const path = new URL(request.url).pathname.replace(/\/+$/, '');
+  return path === '/api/alerts/push';
+}
+
 export async function onRequest(context) {
   const { request, next, env, data } = context;
   const origin = request.headers.get('Origin');
@@ -18,9 +24,13 @@ export async function onRequest(context) {
       env
     );
   }
-  const auth = await requireUser(request, env);
-  if (auth.response) return auth.response;
-  data.userId = auth.userId;
+  // The laptop watcher is not a Clerk user. POST /api/alerts/push checks
+  // X-Alert-Push-Secret itself. Every other /api route still requires Clerk.
+  if (!isWatcherPush(request)) {
+    const auth = await requireUser(request, env);
+    if (auth.response) return auth.response;
+    data.userId = auth.userId;
+  }
   const res = await next();
   return withCors(res, request, env);
 }

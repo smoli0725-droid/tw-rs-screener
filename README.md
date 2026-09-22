@@ -223,6 +223,8 @@ GitHub → **Settings → Secrets and variables → Actions**：
 | `D1_DATABASE_ID` | `wrangler d1 create` 得到的 UUID |
 | `R2_TEACHING_BUCKET` | 教學封面 R2。設成 `flashpick-teaching` 後 deploy 才會綁 `TEACHING_COVERS` |
 
+到價推播的 VAPID 私鑰與 `ALERT_PUSH_SECRET` **不要**放進 GitHub Actions。它們是 Cloudflare Pages runtime secrets，沒設時部署仍會成功，推播 API 回 503。
+
 Cloudflare → Pages → **tradingvenator** → Settings → Environment variables（Production **and** Preview）：
 
 ```bash
@@ -236,6 +238,113 @@ npx wrangler pages secret put CLERK_JWT_KEY --project-name=tradingvenator
 教學封面圖：設好 `R2_TEACHING_BUCKET` 後，網站上的「選擇圖片上傳」才能把檔案存進 R2（binding **`TEACHING_COVERS`**、bucket **`flashpick-teaching`**）。這是一次性基礎設施，見上方「一次性基礎設施：教學封面 R2」。
 
 若之後接自訂網域，請加到：(1) Clerk allowed origins (2) `functions/_lib/cors.js` 的 production origin 或 Pages env `ALLOWED_ORIGINS`。
+
+### 到價推播（Web Push v1）
+
+登入使用者可在 **設定 → 到價推播** 開啟瀏覽器通知。白名單筆電用永豐 **行情**（ticks）看到目標價後，呼叫 `POST /api/alerts/push`。本站與這支腳本都 **不下單**（不呼叫 `activate_ca`）。一般使用者不必、也不能自己接永豐。
+
+沒設定下列 secrets 時：設定頁顯示「伺服器尚未設定推播」，其餘頁面與部署不受影響。
+
+#### 1) 產生 VAPID 與共享密鑰
+
+在任何有 Node 的機器（金鑰只產生一次）：
+
+```bash
+npx web-push generate-vapid-keys
+openssl rand -base64 32
+```
+
+`Public Key` / `Private Key` 都是 URL-safe Base64。`web-push` 的 32-byte 私鑰與 PKCS8 私鑰都可以。私鑰不要 commit、不要放進 GitHub Actions。
+
+#### 2) Cloudflare Pages secrets
+
+Production **與** Preview 都要設（或只用 `wrangler pages secret put`，會寫進該專案）：
+
+```bash
+npx wrangler pages secret put VAPID_PUBLIC_KEY --project-name=tradingvenator
+npx wrangler pages secret put VAPID_PRIVATE_KEY --project-name=tradingvenator
+npx wrangler pages secret put ALERT_PUSH_SECRET --project-name=tradingvenator
+# 可選，預設 mailto:smoli0725@gmail.com
+npx wrangler pages secret put VAPID_SUBJECT --project-name=tradingvenator
+```
+
+| Secret | 用途 |
+|---|---|
+| `VAPID_PUBLIC_KEY` | 瀏覽器 `pushManager.subscribe` 的 applicationServerKey |
+| `VAPID_PRIVATE_KEY` | 伺服器簽 VAPID JWT。只放 Pages |
+| `ALERT_PUSH_SECRET` | 筆電呼叫 `POST /api/alerts/push` 的 `X-Alert-Push-Secret` |
+| `VAPID_SUBJECT` | 可選。`mailto:` 或 `https://` 聯絡方式 |
+
+本機 `wrangler pages dev` 把同樣的名字寫進 `.dev.vars`（見 `.dev.vars.example`）。
+
+#### 3) D1 migration
+
+```bash
+npx wrangler d1 execute tradingvenator --remote --file=migrations/0002_push_subscriptions.sql
+```
+
+表 `push_subscriptions`：`user_id`（Clerk）、`endpoint`、`p256dh`、`auth`、`created_at`，以及可選的 `user_agent`。Deploy workflow 會嘗試套用此檔；token 沒有 D1 Edit 時不擋部署，請用上面的指令手動跑一次。
+
+#### 4) 瀏覽器訂閱 → 手動推一則
+
+1. 用已登入帳號打開網站 → **設定** → **開啟推播** → 允許通知。iPhone 要先 Safari「加入主畫面」，從主畫面圖示開啟後才能訂閱。
+2. 分頁開著時，同一則通知也會在頁面上顯示一行提示。
+3. 手動打 send API（會推給 **所有** `alerts_enabled = 1` 的訂閱；這是 v1 預設，因為到價清單在筆電上，不在每位使用者的持股裡）：
+
+```bash
+curl -sS -X POST https://tradingvenator.pages.dev/api/alerts/push \
+  -H "Content-Type: application/json" \
+  -H "X-Alert-Push-Secret: $ALERT_PUSH_SECRET" \
+  -d '{"symbol":"2330","title":"2330 到價測試","body":"這是一則手動測試","url":"/"}'
+```
+
+成功時 JSON 含 `sent`。推播服務回 **404 / 410** 的 endpoint 會從 D1 刪除。
+
+只推給特定人時加上 `clerk_user_id` 或 `user_ids`（Clerk user id，最多 50 筆）。省略這兩個欄位就是 fan-out。`url` 只能是本站相對路徑，或 `https://tradingvenator.pages.dev`（含 preview 子網域）。
+
+關閉推播會在這台瀏覽器 `unsubscribe`，並刪掉該 endpoint。
+
+#### 5) 白名單筆電（交易時段）
+
+複製範例清單（此檔已 gitignore，勿提交真實目標價）：
+
+```bash
+cp scripts/alerts/watchlist.example.json scripts/alerts/watchlist.json
+pip install shioaji requests
+```
+
+`watchlist.json`：
+
+```json
+{
+  "user_ids": [],
+  "symbols": [
+    {"symbol": "2330", "name": "台積電", "target": 950, "direction": "above"}
+  ]
+}
+```
+
+`user_ids` 留空 = 推給所有已開啟推播的人。`direction` 為 `above`（現價 ≥ 目標）或 `below`（現價 ≤ 目標）。同一組代號＋方向＋目標只會送出一次，紀錄在 `scripts/alerts/.alert-hits.json`。
+
+在 **IP 已白名單** 的筆電上，於台北時間週一至週五 09:00–13:30 執行（腳本也會自己擋在這個時段外，除非加 `--ignore-hours`）：
+
+```bash
+export SHIOAJI_API_KEY="..."          # 行情用，不要配憑證密碼
+export SHIOAJI_SECRET_KEY="..."
+export ALERT_PUSH_SECRET="..."        # 與 Pages secret 相同
+export ALERT_PUSH_URL="https://tradingvenator.pages.dev/api/alerts/push"
+
+python scripts/alerts/confirm_watch.py
+```
+
+- 訂閱 `QuoteType.Tick`（v1）。不看委託、不下單。
+- `--once`：改抓一次 snapshot 後結束，適合自己用 cron 打在盤中。
+- `--dry-run`：只印出將送出的 JSON。
+- `--reset-dedupe`：開跑前清掉去重檔。
+- `--ignore-hours`：略過時段檢查（測連線用）。
+- 不登入永豐、只測推播：`python scripts/alerts/confirm_watch.py --send-test`
+
+模擬環境可設 `SHIOAJI_SIMULATION=1`（仍不下單）。正式看盤不要開。
 
 ### 怎麼驗證 / How to verify
 
@@ -273,7 +382,7 @@ cd site && python3 -m http.server 8080
 ### 架構摘要
 
 - Frontend：`site/js/auth.js` 載入 `@clerk/clerk-js` CDN；`storage.js` 登入後拉雲端、變更時 PUT
-- Backend：Cloudflare Pages Functions（`functions/api/me.js`、`functions/api/data.js`、`functions/api/lessons/index.js`、`functions/api/lessons/cover.js`）用 `@clerk/backend` `authenticateRequest`
+- Backend：Cloudflare Pages Functions（`functions/api/me.js`、`functions/api/data.js`、`functions/api/lessons/index.js`、`functions/api/lessons/cover.js`、`functions/api/alerts/*`）用 `@clerk/backend` `authenticateRequest`。例外：`POST /api/alerts/push` 用 `X-Alert-Push-Secret`，不走 Clerk
 - 教學封面：R2 binding `TEACHING_COVERS`；公開讀 `GET /covers/:key`（不需登入）；上傳 `POST /api/lessons/cover`（僅站長）
 - CORS 只允許 `https://tradingvenator.pages.dev` 與 localhost
 - 每日 RS Python pipeline（`rs_calculator.py` / `daily_rs.yml`）與 Flutter App **沒有**改動

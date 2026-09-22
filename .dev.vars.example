@@ -9,3 +9,9 @@ CLERK_SECRET_KEY=sk_test_REPLACE_ME
 # OWNER_EMAIL=smoli0725@gmail.com
 # Optional. Public base for cover URLs if the R2 bucket is public (otherwise /covers/{key}).
 # COVER_PUBLIC_BASE=https://pub-xxxxxxxx.r2.dev
+# Web Push (optional). Missing keys disable push; the rest of the site still runs.
+# Generate with: npx web-push generate-vapid-keys
+# VAPID_PUBLIC_KEY=
+# VAPID_PRIVATE_KEY=
+# ALERT_PUSH_SECRET=
+# VAPID_SUBJECT=mailto:you@example.com

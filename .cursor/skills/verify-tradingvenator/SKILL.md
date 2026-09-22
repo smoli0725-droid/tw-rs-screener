@@ -98,7 +98,7 @@ Stable handles:
 | Patterns | `#statusChips` (`data-status`), `#patternChips` (`data-pattern`), `#patternList`, `#patternCount` |
 | Trade tracking | `#tradeChips` (`data-trade`: `active\|success\|failed\|recovered`), `#tradeList`, `#tradeCount` |
 | Portfolio | `#positionList`, `#totalMv`, `#totalPnl`, `#addTradeBtn`, `#metricsBtn` |
-| Settings | `#dataBaseUrl`, `#saveSettingsBtn`, `#resetSettingsBtn`, `#dataStatusBody`, `#accountCard` |
+| Settings | `#dataBaseUrl`, `#saveSettingsBtn`, `#resetSettingsBtn`, `#dataStatusBody`, `#accountCard`, `#pushCard`, `#pushStatus`, `#enablePushBtn`, `#disablePushBtn` |
 | Teaching | `#teachingList`, `#teachingDetailPane`, `#teachingBackBtn`, `#addLessonBtn` / `[data-delete-lesson]` (owner-only), `#lessonCoverFile` (website file upload) |
 
 First mapped proof for a new run: **recommend** (read-only). Recipe is `features/recommend.md`.

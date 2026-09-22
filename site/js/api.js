@@ -66,5 +66,13 @@ window.RS_API = (() => {
       body.append('file', file);
       return request('/api/lessons/cover', { method: 'POST', body });
     },
+    getPushStatus: () => request('/api/alerts/status'),
+    subscribePush: (subscription) =>
+      request('/api/alerts/subscribe', { method: 'POST', body: JSON.stringify(subscription) }),
+    unsubscribePush: (payload) =>
+      request('/api/alerts/unsubscribe', {
+        method: 'POST',
+        body: JSON.stringify(payload || {}),
+      }),
   };
 })();
