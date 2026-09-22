@@ -5,16 +5,11 @@
 
 name: Deploy UI v1 Preview
 
+# workflow_dispatch only. A one-time path-filtered push on this branch
+# already published the preview (Actions run 35688530245). Further pushes
+# do not deploy. Do not add a push trigger on main.
 on:
   workflow_dispatch:
-  # GitHub only registers workflow_dispatch after the file exists on the
-  # default branch. This path-filtered push is what actually runs the preview
-  # from this branch without touching main or deploy-site.yml.
-  push:
-    branches:
-      - cursor/flashpick-ui-v1-preview-d986
-    paths:
-      - .github/workflows/deploy-preview-ui-v1.yml
 
 permissions:
   contents: read
