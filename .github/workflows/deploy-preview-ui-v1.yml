@@ -1,0 +1,132 @@
+# One-time Cloudflare Pages PREVIEW for FlashPick UI v1.
+# Do not merge this to main. This file never deploys with --branch=main.
+# Production remains .github/workflows/deploy-site.yml
+# (pages deploy --project-name=tradingvenator --branch=main).
+
+name: Deploy UI v1 Preview
+
+# workflow_dispatch only. A one-time path-filtered push on this branch
+# already published the preview (Actions run 35688530245). Further pushes
+# do not deploy. Do not add a push trigger on main.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-deploy-ui-v1-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/cursor/flashpick-ui-v1-preview-d986'
+    runs-on: ubuntu-latest
+    env:
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+      R2_TEACHING_BUCKET: ${{ secrets.R2_TEACHING_BUCKET }}
+      # Preview alias only. Never main.
+      PAGES_PREVIEW_BRANCH: ui-v1-preview
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse production deploy
+        run: |
+          set -euo pipefail
+          if [ "${PAGES_PREVIEW_BRANCH}" = "main" ]; then
+            echo "::error::Refusing to deploy preview workflow with branch=main"
+            exit 1
+          fi
+          if [ "${GITHUB_REF}" != "refs/heads/cursor/flashpick-ui-v1-preview-d986" ]; then
+            echo "::error::Refusing to run outside the UI v1 preview branch"
+            exit 1
+          fi
+          cmd="pages deploy --project-name=tradingvenator --branch=${PAGES_PREVIEW_BRANCH} --commit-dirty=true"
+          case "${cmd}" in
+            *"--branch=main"*)
+              echo "::error::Deploy command targeted production branch"
+              exit 1
+              ;;
+          esac
+          echo "Preview deploy command: ${cmd}"
+          echo "PAGES_DEPLOY_CMD=${cmd}" >> "${GITHUB_ENV}"
+
+      - name: Check Cloudflare secrets
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "::error::缺少 Cloudflare secrets。請到 repo Settings → Secrets and variables → Actions 新增："
+            echo "  1) CLOUDFLARE_API_TOKEN"
+            echo "  2) CLOUDFLARE_ACCOUNT_ID"
+            echo "設定步驟見 README「網站版」章節。"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install Pages Functions dependencies
+        working-directory: functions
+        run: npm ci
+
+      - name: Bundle daily JSON into site/data
+        run: |
+          rm -rf site/data
+          mkdir -p site/data
+          if [ -d output/app ]; then
+            cp -a output/app/. site/data/
+          else
+            echo '{"data_date":null,"is_fresh":false,"message":"no output/app yet","counts":{}}' > site/data/meta.json
+            echo '[]' > site/data/rs85.json
+            echo '[]' > site/data/patterns.json
+          fi
+          touch site/.nojekyll
+          ls -la site/data | head
+
+      - name: Inject Clerk publishable key, D1 id, and R2 bucket
+        run: python3 scripts/inject_pages_config.py
+
+      # Token needs Account / R2 / Edit. Bucket may already exist — do not block deploy.
+      - name: Ensure R2 teaching bucket
+        if: env.R2_TEACHING_BUCKET != ''
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "3.99.0"
+          command: r2 bucket create flashpick-teaching
+
+      # Schema already applied via dashboard/MCP; token may lack D1 Edit — don't block Pages deploy.
+      # Idempotent CREATE TABLE IF NOT EXISTS. Does not publish Pages production.
+      - name: Apply D1 schema
+        if: env.D1_DATABASE_ID != ''
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "3.99.0"
+          command: d1 execute tradingvenator --remote --file=migrations/0001_init.sql --yes
+
+      - name: Deploy preview to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "3.99.0"
+          # Preview alias only. Production branch stays main via deploy-site.yml.
+          command: pages deploy --project-name=tradingvenator --branch=ui-v1-preview --commit-dirty=true
+
+      - name: Record preview URLs
+        run: |
+          {
+            echo "### UI v1 Pages preview"
+            echo ""
+            echo "- Base: https://ui-v1-preview.tradingvenator.pages.dev"
+            echo "- Welcome: https://ui-v1-preview.tradingvenator.pages.dev/welcome/"
+            echo "- Deploy branch alias: ui-v1-preview (not main)"
+          } >> "${GITHUB_STEP_SUMMARY}"

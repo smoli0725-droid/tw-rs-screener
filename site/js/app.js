@@ -135,43 +135,137 @@
       </div>`;
   }
 
+  function formatPx(n) {
+    if (n == null || Number.isNaN(Number(n))) return '—';
+    return Number(n).toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function formatPct1(n) {
+    if (n == null || Number.isNaN(Number(n))) return '—';
+    const v = Number(n) * 100;
+    return `${v > 0 ? '+' : ''}${v.toFixed(1)}%`;
+  }
+
+  function formatPct2(n) {
+    if (n == null || Number.isNaN(Number(n))) return '—';
+    const v = Number(n) * 100;
+    return `${v > 0 ? '+' : ''}${v.toFixed(2)}%`;
+  }
+
+  function formatMonthLabel(key) {
+    const match = String(key || '').match(/^(\d{4})-(\d{2})$/);
+    if (!match) return '本月';
+    return `${match[1]}年${Number(match[2])}月`;
+  }
+
+  function viewJournal() {
+    const real = RS_STORAGE.loadTrades();
+    if (real.length || !window.RS_PREVIEW) {
+      return { trades: real, prices: state.priceMap, sample: false };
+    }
+    return {
+      trades: RS_PREVIEW.demoTrades(),
+      prices: RS_PREVIEW.demoPrices(),
+      sample: true,
+    };
+  }
+
+  function curveMarkup(points) {
+    if (!points || points.length < 2) {
+      return '<p class="metric-note">尚無已實現損益</p>';
+    }
+    const w = 280;
+    const h = 78;
+    const pad = 4;
+    const vals = points.map((p) => p.pnl);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const span = max - min || 1;
+    const coords = vals.map((v, i) => {
+      const x = pad + (i / (vals.length - 1)) * (w - pad * 2);
+      const y = pad + (1 - (v - min) / span) * (h - pad * 2);
+      return [x, y];
+    });
+    const line = coords.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+    const area = `${line} L${coords[coords.length - 1][0].toFixed(1)} ${h} L${coords[0][0].toFixed(1)} ${h} Z`;
+    return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="已實現損益成長曲線"><path d="${area}" fill="rgba(28,28,28,0.08)"></path><path d="${line}" fill="none" stroke="#1c1c1c" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path></svg>`;
+  }
+
+  function renderMetricCards(metrics, sample) {
+    const win = $('#metricWinRate');
+    if (!win) return;
+    win.textContent = metrics.winRate == null ? '—' : `${Math.round(metrics.winRate * 100)}%`;
+    $('#metricWinRateNote').textContent = metrics.closedCount
+      ? `近 ${metrics.closedCount} 筆手記平倉${sample ? ' · 示例資料' : ''}`
+      : '尚無手記平倉';
+    const winAvg = $('#metricWinAvg');
+    winAvg.textContent = formatPct1(metrics.winningAvgReturnPct);
+    winAvg.className = `metric-value ${fmt.pnlClass(metrics.winningAvgReturnPct || 0)}`;
+    const month = $('#metricMonth');
+    month.textContent = formatPct1(metrics.monthReturnPct);
+    month.className = `metric-value ${fmt.pnlClass(metrics.monthReturnPct || 0)}`;
+    $('#metricMonthNote').textContent = `${formatMonthLabel(metrics.monthKey)}${sample ? ' · 示例資料' : ' · 已實現'}`;
+    $('#metricCurve').innerHTML = curveMarkup(metrics.realizedCurve);
+    $('#metricCurveNote').textContent = sample ? '累計已實現 · 示例資料' : '累計已實現';
+  }
+
   function renderPortfolio() {
-    const positions = RS_PORTFOLIO.buildPositions(RS_STORAGE.loadTrades(), state.priceMap);
+    const journal = viewJournal();
+    const positions = RS_PORTFOLIO.buildPositions(journal.trades, journal.prices);
+    const metrics = RS_PORTFOLIO.computeMetrics(journal.trades, positions);
     const mv = positions.reduce((s, p) => s + p.marketValue, 0);
     const pnl = positions.reduce((s, p) => s + p.pnl, 0);
     const cost = positions.reduce((s, p) => s + p.costValue, 0);
-    $('#totalMv').textContent = fmt.money(mv);
+    $('#totalMv').textContent = mv.toLocaleString('zh-TW', { maximumFractionDigits: 0 });
     const pnlEl = $('#totalPnl');
-    pnlEl.textContent = `損益 ${fmt.money(pnl)}（${fmt.pct(cost ? pnl / cost : 0)}）`;
-    pnlEl.className = `summary-sub ${fmt.pnlClass(pnl)}`;
+    if (journal.sample) {
+      pnlEl.textContent = '';
+      pnlEl.className = 'summary-sub';
+    } else {
+      pnlEl.textContent = positions.length
+        ? `未實現 ${fmt.money(pnl)}（${fmt.pct(cost ? pnl / cost : 0)}）`
+        : '未實現 —';
+      pnlEl.className = `summary-sub ${fmt.pnlClass(pnl)}`;
+    }
+    const note = $('#portfolioNote');
+    if (note) {
+      note.textContent = journal.sample
+        ? '示例資料 · 下列數字皆為靜態示意，不代表真實損益或帳戶'
+        : '勝率與成功單報酬只計你手記的平倉，不含系統突破帳本。';
+    }
+    $$('.demo-badge').forEach((el) => {
+      el.hidden = !journal.sample;
+    });
+    renderMetricCards(metrics, journal.sample);
 
     const list = $('#positionList');
     if (!positions.length) {
       list.innerHTML = '<div class="empty">尚未有持股，點上方新增</div>';
       return;
     }
-    list.innerHTML = positions
-      .map(
-        (p) => `<article class="item" data-open-chart="${p.symbol}" data-name="${esc(p.name)}" data-market="${esc(p.market)}">
-        <div>
-          <div class="item-title">${p.symbol} ${esc(p.name)}${
-            p.lastPrice == null ? '<span class="badge warn">無報價</span>' : ''
-          }</div>
-          <div class="item-sub">成本 ${fmt.money(p.cost)} × ${p.shares}<br/>現價 ${
-            p.lastPrice == null ? '暫用成本估算' : fmt.money(p.lastPrice)
-          }</div>
-        </div>
-        <div class="item-right">
-          <div class="${fmt.pnlClass(p.returnPct)}">${fmt.pct(p.returnPct)}</div>
-          <div class="item-sub ${fmt.pnlClass(p.pnl)}">${fmt.money(p.pnl)}</div>
-        </div>
-        <div class="item-actions">
-          <button type="button" class="ghost-btn" data-sell="${p.symbol}">賣出</button>
-          <button type="button" class="ghost-btn" data-delete-pos="${p.symbol}" data-name="${esc(p.name)}">刪除</button>
-        </div>
-      </article>`
-      )
-      .join('');
+    list.innerHTML = `<div class="holdings-table-wrap"><table class="holdings-table"><thead><tr>
+        <th>標的</th><th>股數</th><th>成本</th><th>現價</th><th>報酬</th>${journal.sample ? '' : '<th></th>'}
+      </tr></thead><tbody>${positions
+        .map((p) => {
+          const quote = p.lastPrice == null ? '暫用成本' : formatPx(p.lastPrice);
+          const rowActions = journal.sample
+            ? ''
+            : `<td class="holding-actions">
+                <button type="button" class="ghost-btn" data-sell="${p.symbol}">賣出</button>
+                <button type="button" class="ghost-btn" data-delete-pos="${p.symbol}" data-name="${esc(p.name)}">刪除</button>
+              </td>`;
+          return `<tr class="holding-row" data-open-chart="${p.symbol}" data-name="${esc(p.name)}" data-market="${esc(p.market)}">
+            <td class="holding-name">${p.symbol} ${esc(p.name)}${
+              p.lastPrice == null ? '<span class="badge warn">無報價</span>' : ''
+            }</td>
+            <td>${p.shares}</td>
+            <td>${formatPx(p.cost)}</td>
+            <td>${quote}</td>
+            <td class="${fmt.pnlClass(p.returnPct)}">${formatPct1(p.returnPct)}</td>
+            ${rowActions}
+          </tr>`;
+        })
+        .join('')}</tbody></table></div>`;
   }
 
   function renderRs85() {
@@ -328,33 +422,72 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
       .join('');
   }
 
+  function applyChartSummary(summary, sample, pivot) {
+    const rangeWord = { D: '日線', W: '週線', M: '月線' }[state.chartRange] || '日線';
+    const bits = [sample ? `${rangeWord} · 示例資料 · 非即時報價` : `${rangeWord} · 非即時報價`];
+    if (pivot) bits.push(`樞紐 ${fmt.money(Number(pivot))}`);
+    $('#chartSub').textContent = bits.join(' · ');
+    const lastEl = $('#chartLast');
+    const chgEl = $('#chartChg');
+    if (!lastEl || !chgEl) return;
+    if (!summary) {
+      lastEl.textContent = '—';
+      chgEl.textContent = '';
+      return;
+    }
+    lastEl.textContent = formatPx(summary.lastClose);
+    const sign = summary.change > 0 ? '+' : '';
+    chgEl.textContent = `${sign}${Number(summary.change).toFixed(2)} · ${formatPct2(summary.changePct)}`;
+    chgEl.className = `chart-chg ${fmt.pnlClass(summary.change)}`;
+  }
+
+  function paintChart(raw, sample) {
+    const ctx = state.chartContext || {};
+    const pivot = ctx.pivot !== '' && ctx.pivot != null ? Number(ctx.pivot) : null;
+    const ohlcv = {
+      candles: (raw.candles || []).map((c) => ({
+        ...c,
+        ma50: c.ma50 ?? c.ma_50,
+        ma100: c.ma100 ?? c.ma_100,
+        ma150: c.ma150 ?? c.ma_150,
+        ma200: c.ma200 ?? c.ma_200,
+      })),
+      annotations: raw.annotations || [],
+    };
+    state.chartOhlcv = ohlcv;
+    state.chartSample = sample;
+    const summary = RS_CHART.draw($('#chartHost'), ohlcv, pivot);
+    $('#chartLegend').textContent = RS_CHART.legendText(ohlcv);
+    applyChartSummary(summary, sample, pivot);
+  }
+
   async function openChart(id, name, market, pivot) {
     state.chartContext = { id, name, market, pivot };
-    $('#chartTitle').textContent = `${id} ${name || ''}`;
-    $('#chartSub').textContent = pivot ? `樞紐 ${fmt.money(Number(pivot))}` : market || '';
+    state.chartRange = 'D';
+    state.chartSample = false;
+    $('#chartTitle').textContent = `${id} ${name || ''}`.trim();
+    $('#chartSub').textContent = '載入 K 線…';
+    $$('#chartRanges .chip').forEach((c) => c.classList.toggle('active', c.dataset.range === 'D'));
+    if (window.RS_CHART) RS_CHART.setRange('D');
     $('#chartDialog').showModal();
     try {
       const raw = await RS_DATA.loadOhlcv(RS_STORAGE.getDataBaseUrl(), id);
-      const ohlcv = {
-        candles: (raw.candles || []).map((c) => ({
-          ...c,
-          ma50: c.ma50 ?? c.ma_50,
-          ma150: c.ma150 ?? c.ma_150,
-          ma200: c.ma200 ?? c.ma_200,
-        })),
-        annotations: raw.annotations || [],
-      };
-      RS_CHART.draw($('#chartCanvas'), ohlcv, pivot !== '' && pivot != null ? Number(pivot) : null);
-      $('#chartLegend').textContent = RS_CHART.legendText(ohlcv);
+      paintChart(raw, false);
     } catch (e) {
-      RS_CHART.draw($('#chartCanvas'), { candles: [] }, null);
+      const candles = window.RS_PREVIEW && RS_PREVIEW.sampleCandles(id);
+      if (candles) {
+        paintChart({ candles, annotations: [] }, true);
+        return;
+      }
+      RS_CHART.draw($('#chartHost'), { candles: [] }, null);
       $('#chartLegend').textContent = `K 線載入失敗：${e.message}`;
+      applyChartSummary(null, false, null);
     }
   }
 
   // navigation
   function showView(view, opts = {}) {
-    $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+    $$('.nav-item, .side-link').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
     $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
     if (view === 'teaching' && window.RS_TEACHING) {
       if (opts.hash) RS_TEACHING.openFromHash(opts.hash);
@@ -370,11 +503,39 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     return String(location.hash || '').replace(/^#/, '').startsWith('teaching');
   }
 
-  $$('.nav-item').forEach((btn) => {
+  $$('.nav-item, .side-link').forEach((btn) => {
     btn.addEventListener('click', () => {
       showView(btn.dataset.view);
     });
   });
+  const sidebarToggle = $('#sidebarToggle');
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+      const collapsed = document.body.classList.toggle('sidebar-collapsed');
+      sidebarToggle.textContent = collapsed ? '›' : '‹';
+      sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+      sidebarToggle.setAttribute('aria-label', collapsed ? '展開側欄' : '收合側欄');
+    });
+  }
+  state.chartRange = 'D';
+  const chartRanges = $('#chartRanges');
+  if (chartRanges) {
+    chartRanges.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-range]');
+      if (!btn) return;
+      if (btn.dataset.range === 'I') {
+        toast('尚無分線資料');
+        return;
+      }
+      state.chartRange = btn.dataset.range;
+      $$('#chartRanges .chip').forEach((c) => c.classList.toggle('active', c === btn));
+      RS_CHART.setRange(btn.dataset.range);
+      if (!state.chartOhlcv) return;
+      const pivot = state.chartContext && state.chartContext.pivot;
+      const summary = RS_CHART.redraw();
+      applyChartSummary(summary, state.chartSample, pivot);
+    });
+  }
   $$('#view-recommend .tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       $$('#view-recommend .tab').forEach((t) => t.classList.remove('active'));
@@ -563,15 +724,20 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
   });
 
   $('#metricsBtn').addEventListener('click', () => {
-    const trades = RS_STORAGE.loadTrades();
-    const positions = RS_PORTFOLIO.buildPositions(trades, state.priceMap);
-    const m = RS_PORTFOLIO.computeMetrics(trades, positions);
+    const journal = viewJournal();
+    const positions = RS_PORTFOLIO.buildPositions(journal.trades, journal.prices);
+    const m = RS_PORTFOLIO.computeMetrics(journal.trades, positions);
     $('#metricsBody').innerHTML = `
+      <p class="hint">${journal.sample ? '示例資料。' : ''}勝率與成功單平均報酬只計手記平倉（FIFO，賺錢的單另計），不含系統突破帳本。</p>
       <p>勝率：<strong>${m.winRate == null ? '—' : fmt.pct(m.winRate)}</strong>
         <span class="hint">（${
-          m.closedCount ? `已平倉 ${m.closedCount} 筆` : `尚無平倉，改以持股 ${m.openCount} 檔`
+          m.closedCount ? `已平倉 ${m.closedCount} 筆` : '尚無手記平倉'
         }）</span></p>
-      <p>平均報酬（已平倉）：<strong class="${fmt.pnlClass(m.avgReturnPct || 0)}">${
+      <p>成功單平均報酬：<strong class="${fmt.pnlClass(m.winningAvgReturnPct || 0)}">${
+        m.winningAvgReturnPct == null ? '—' : fmt.pct(m.winningAvgReturnPct)
+      }</strong>
+        <span class="hint">（僅 ${m.winningCount || 0} 筆賺錢的平倉）</span></p>
+      <p>平均報酬（全部已平倉）：<strong class="${fmt.pnlClass(m.avgReturnPct || 0)}">${
         m.avgReturnPct == null ? '—' : fmt.pct(m.avgReturnPct)
       }</strong></p>
       <p>平均報酬（持股）：<strong class="${fmt.pnlClass(m.avgOpenReturnPct || 0)}">${
