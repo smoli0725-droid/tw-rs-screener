@@ -36,6 +36,8 @@ import sys
 import numpy as np
 import pandas as pd
 
+from market_calendar import ensure_market_open
+
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
 TWSE_DAY_ALL = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
 TWSE_MI_INDEX = "https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX"
@@ -686,7 +688,7 @@ def main():
     ap.add_argument("--skip-patterns", action="store_true",
                     help="略過型態篩選與 App JSON 匯出")
     ap.add_argument("--skip-freshness", action="store_true",
-                    help="略過資料新鮮度檢查(測試用)")
+                    help="略過資料新鮮度檢查，也略過休市提前結束(測試用)")
     args = ap.parse_args()
 
     if args.test:
@@ -700,6 +702,9 @@ def main():
             "twse_cross_check": None,
         }
     else:
+        if not args.skip_freshness:
+            # 休市／週末沒有當日收盤。下載前 exit 0，避免整晚把休市當成資料延遲。
+            ensure_market_open()
         uni = get_universe()
         print(f"股票池:{len(uni)} 檔(上市 {sum(uni['市場']=='上市')}、上櫃 {sum(uni['市場']=='上櫃')})")
         ohlcv, close, volume = fetch_prices(uni["yf_ticker"].tolist())

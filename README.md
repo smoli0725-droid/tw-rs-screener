@@ -71,6 +71,8 @@ gh workflow run daily_rs.yml --repo smoli0725-droid/tw-rs-screener
 
 平日若 Yahoo 與 TWSE 都還沒有今日檔,程式以 exit 2 結束、**不 commit 舊資料**,等下一個時段。Yahoo 已是今天時,即使抽樣價與 TWSE 差 >3% 也不再擋下(避免還原價誤殺)。
 
+週末與證交所休市日(國定假日、補假、只辦結算交割的無交易日)在下載全市場之前就結束:日誌 `今天(YYYY-MM-DD)休市，略過`,exit 0,不重算、不 commit。休市表先打 TWSE holidaySchedule;該年沒有資料或連線失敗時用 `data/twse_market_closures.json`(2026 為證交所公布表,2027 在證交所尚未公布前依行政院辦公日曆表的平日放假)。名稱含「開始交易」或「最後交易」的列不是休市。颱風等臨時休市若寫在休市表,或出現在當日(或前一日宣布明日)的 TWSE 新聞標題,同樣略過。判斷失敗則視為交易日,資料晚到仍 exit 2。休市略過沒有新 commit,Deploy Web Site 不會因這次 Daily RS 成功而重部署。若要在休市日強制重算,可 `python rs_calculator.py --skip-freshness`(排程不會這樣做)。
+
 `output/` 的 commit 若與 `main` 上既有 RS 產物衝突,會改以「剛算完的 `output/`」為準 rebase/重放,不會 `--force` push `main`。
 
 ```bash

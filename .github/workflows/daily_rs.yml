@@ -16,6 +16,11 @@ on:
     #
     # For a punctual run, point an external cron at workflow_dispatch
     # (gh workflow run daily_rs.yml) instead of relying on schedule.
+    #
+    # Weekday holidays (and weekends, if dispatched) are a clean skip:
+    # market_calendar.py exits 0 before the download, and this job does
+    # not commit. Late data on a real trading day still fails the
+    # calculator with exit 2 so the next slot retries.
     - cron: "30 9 * * 1-5"
     - cron: "0 10 * * 1-5"
     - cron: "30 10 * * 1-5"
@@ -64,12 +69,17 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run RS calculator + pattern screener
+      - name: Skip if TWSE is closed
+        id: closed
         if: steps.skip.outputs.skip != 'true'
+        run: python market_calendar.py
+
+      - name: Run RS calculator + pattern screener
+        if: ${{ steps.skip.outputs.skip != 'true' && steps.closed.outputs.closed != 'true' }}
         run: python rs_calculator.py
 
       - name: Commit results
-        if: steps.skip.outputs.skip != 'true'
+        if: ${{ steps.skip.outputs.skip != 'true' && steps.closed.outputs.closed != 'true' }}
         run: |
           set -euo pipefail
           git config user.name "rs-bot"
