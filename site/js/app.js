@@ -654,18 +654,28 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
       toast('請確認賣出價／股數');
       return;
     }
-    if (shares > pos.shares) {
-      toast(`賣出股數不可超過目前持股 ${pos.shares}`);
-      return;
-    }
-    RS_STORAGE.addSell({
+    const candidate = {
       symbol,
       name: String(fd.get('name') || pos.name || symbol).trim(),
       market: String(fd.get('market') || pos.market || '上市'),
       price,
       shares,
       date: String(fd.get('date')),
-    });
+    };
+    const matched = RS_PORTFOLIO.matchedSellShares(RS_STORAGE.loadTrades(), candidate);
+    if (matched < shares) {
+      toast(
+        matched === 0
+          ? '這個日期只能賣出 0 股，買進還在這天之後'
+          : `這個日期只能賣出 ${matched} 股，其餘是這天之後才買的`
+      );
+      return;
+    }
+    if (shares > pos.shares) {
+      toast(`賣出股數不可超過目前持股 ${pos.shares}`);
+      return;
+    }
+    RS_STORAGE.addSell(candidate);
     $('#sellDialog').close();
     renderPortfolio();
     toast(shares >= pos.shares ? '已全部賣出' : '已賣出');

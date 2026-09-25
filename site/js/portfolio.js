@@ -1,8 +1,26 @@
 window.RS_PORTFOLIO = (() => {
-  function buildPositions(trades, priceMap = {}) {
+  function calendarDate(value) {
+    return String(value ?? '').slice(0, 10);
+  }
+
+  function orderedTrades(trades) {
+    return trades
+      .map((trade, index) => ({ trade, index }))
+      .sort((a, b) => {
+        const byDate = calendarDate(a.trade.date).localeCompare(calendarDate(b.trade.date));
+        if (byDate) return byDate;
+        const bySide = ((a.trade.side || 'buy') === 'buy' ? 0 : 1) - ((b.trade.side || 'buy') === 'buy' ? 0 : 1);
+        if (bySide) return bySide;
+        return a.index - b.index;
+      })
+      .map((row) => row.trade);
+  }
+
+  function walkJournal(trades) {
     const lots = {};
-    const sorted = [...trades].sort((a, b) => String(a.date).localeCompare(String(b.date)));
-    for (const t of sorted) {
+    const buys = {};
+    const closed = [];
+    for (const t of orderedTrades(trades)) {
       const sym = String(t.symbol);
       const lot = (lots[sym] ??= {
         symbol: sym,
@@ -19,11 +37,44 @@ window.RS_PORTFOLIO = (() => {
         lot.shares = next;
         lot.name = t.name || lot.name;
         lot.market = t.market || lot.market;
+        (buys[sym] ??= []).push({ shares, price, date: t.date });
       } else {
         lot.shares = Math.max(0, lot.shares - shares);
         if (!lot.shares) lot.cost = 0;
+        let remain = shares;
+        const q = buys[sym] || [];
+        while (remain > 0 && q.length) {
+          const open = q[0];
+          const matched = Math.min(remain, open.shares);
+          closed.push({
+            trade: t,
+            shares: matched,
+            sellDate: t.date,
+            returnPct: open.price ? price / open.price - 1 : 0,
+            pnl: (price - open.price) * matched,
+            cost: open.price * matched,
+          });
+          open.shares -= matched;
+          remain -= matched;
+          if (open.shares <= 0) q.shift();
+        }
       }
     }
+    return { lots, closed };
+  }
+
+  function matchedSellShares(trades, candidate) {
+    const sell = { ...candidate, side: 'sell' };
+    const { closed } = walkJournal([...trades, sell]);
+    let matched = 0;
+    for (const row of closed) {
+      if (row.trade === sell) matched += row.shares;
+    }
+    return matched;
+  }
+
+  function buildPositions(trades, priceMap = {}) {
+    const { lots } = walkJournal(trades);
     return Object.values(lots)
       .filter((p) => p.shares > 0)
       .map((p) => {
@@ -57,31 +108,7 @@ window.RS_PORTFOLIO = (() => {
   // Closed lots come only from the trades argument (the user journal).
   // The system breakout ledger is never read here.
   function computeMetrics(trades, positions, now = new Date()) {
-    const sorted = [...trades].sort((a, b) => String(a.date).localeCompare(String(b.date)));
-    const buys = {};
-    const closed = [];
-    for (const t of sorted) {
-      const sym = String(t.symbol);
-      if ((t.side || 'buy') === 'buy') {
-        (buys[sym] ??= []).push({ shares: Number(t.shares), price: Number(t.price), date: t.date });
-      } else {
-        let remain = Number(t.shares);
-        const q = buys[sym] || [];
-        while (remain > 0 && q.length) {
-          const lot = q[0];
-          const matched = Math.min(remain, lot.shares);
-          closed.push({
-            sellDate: t.date,
-            returnPct: lot.price ? Number(t.price) / lot.price - 1 : 0,
-            pnl: (Number(t.price) - lot.price) * matched,
-            cost: lot.price * matched,
-          });
-          lot.shares -= matched;
-          remain -= matched;
-          if (lot.shares <= 0) q.shift();
-        }
-      }
-    }
+    const { closed } = walkJournal(trades);
 
     const winners = closed.filter((c) => c.pnl > 0);
     let winRate = null;
@@ -149,5 +176,5 @@ window.RS_PORTFOLIO = (() => {
     };
   }
 
-  return { buildPositions, computeMetrics };
+  return { buildPositions, computeMetrics, matchedSellShares };
 })();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models.dart';
+import '../../domain/position_builder.dart';
 import 'portfolio_page.dart';
 
 class AddTradeSheet extends ConsumerStatefulWidget {
@@ -53,7 +54,6 @@ class _AddTradeSheetState extends ConsumerState<AddTradeSheet> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate()) return;
-    setState(() => _saving = true);
     final trade = Trade(
       id: widget.initial?.id,
       symbol: _id.text.trim(),
@@ -66,6 +66,22 @@ class _AddTradeSheetState extends ConsumerState<AddTradeSheet> {
       fee: double.tryParse(_fee.text) ?? 0,
     );
     final dao = ref.read(tradeDaoProvider);
+    if (trade.side == TradeSide.sell) {
+      final existing = await dao.all();
+      final baseline = trade.id == null
+          ? existing
+          : [for (final row in existing) if (row.id != trade.id) row];
+      final matched = matchedSellShares(baseline, trade);
+      if (matched < trade.shares) {
+        if (!mounted) return;
+        final message = matched == 0
+            ? '這個日期只能賣出 0 股，買進還在這天之後'
+            : '這個日期只能賣出 $matched 股，其餘是這天之後才買的';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        return;
+      }
+    }
+    setState(() => _saving = true);
     if (trade.id == null) {
       await dao.insert(trade);
     } else {
