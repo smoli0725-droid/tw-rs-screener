@@ -14,20 +14,96 @@ on:
   workflow_dispatch:
   # Daily RS commits with the default GITHUB_TOKEN, which does not trigger
   # other workflows' `push` events. Chain this deploy after that run completes.
+  # A green Daily RS that pushed nothing (TWSE holiday, weekend, or already
+  # fresh) is ignored so we do not redeploy unchanged output.
   workflow_run:
     workflows: ["Daily Taiwan RS Update"]
     types: [completed]
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: web-deploy
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  prepare:
+    name: Decide whether to deploy
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.gate.outputs.proceed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Same ref the deploy job uses, so a Daily RS push is visible
+          # as a branch tip that differs from workflow_run.head_sha.
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.sha }}
+
+      - name: Skip deploy when Daily RS published nothing
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          JOBS_URL: ${{ github.event_name == 'workflow_run' && format('https://api.github.com/repos/{0}/actions/runs/{1}/jobs', github.repository, github.event.workflow_run.id) || '' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          TIP=$(git rev-parse HEAD)
+          START="${{ github.event.workflow_run.head_sha }}"
+          echo "branch tip=$TIP daily_rs_head=$START"
+          if [ "$TIP" != "$START" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # No new commit on the branch tip. Skip deploy only when the
+          # calculator step itself was skipped (holiday, weekend, or already
+          # fresh). If that step ran, deploy anyway — the push may not be
+          # visible on this checkout yet. Step name must match daily_rs.yml.
+          python3 - << 'PY'
+          import json, os, urllib.request
+          out = os.environ["GITHUB_OUTPUT"]
+          url = os.environ.get("JOBS_URL") or ""
+          token = os.environ.get("GITHUB_TOKEN") or ""
+
+          def proceed(value, note):
+              print(note)
+              with open(out, "a", encoding="utf-8") as fh:
+                  fh.write(f"proceed={value}\n")
+
+          if not url or not token:
+              proceed("true", "missing jobs URL; deploying")
+              raise SystemExit(0)
+          req = urllib.request.Request(url, headers={
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "User-Agent": "tw-rs-screener-deploy",
+          })
+          try:
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  payload = json.load(resp)
+          except Exception as exc:
+              proceed("true", f"could not read Daily RS jobs ({exc}); deploying")
+              raise SystemExit(0)
+          conclusions = []
+          for job in payload.get("jobs") or []:
+              for step in job.get("steps") or []:
+                  if step.get("name") == "Run RS calculator + pattern screener":
+                      conclusions.append(step.get("conclusion"))
+          print(f"rs_calculator_steps={conclusions or 'missing'}")
+          if conclusions and all(item == "skipped" for item in conclusions):
+              proceed("false", "Daily RS skipped the calculator. Not deploying.")
+          else:
+              proceed("true", "calculator ran or status unknown; deploying")
+          PY
+
+  deploy:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.proceed == 'true' }}
     runs-on: ubuntu-latest
     env:
       CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
