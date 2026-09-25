@@ -21,6 +21,42 @@ function setup() {
   return sandbox;
 }
 
+test('sell dated before the buy matches no shares and leaves the position open', () => {
+  const { RS_PORTFOLIO } = setup();
+  const buy = { symbol: '2330', side: 'buy', price: 100, shares: 100, date: '2026-09-10' };
+  const candidate = { symbol: '2330', price: 110, shares: 100, date: '2026-09-01' };
+  assert.equal(RS_PORTFOLIO.matchedSellShares([buy], candidate), 0);
+  const trades = [buy, { ...candidate, side: 'sell' }];
+  const positions = RS_PORTFOLIO.buildPositions(trades, {});
+  const metrics = RS_PORTFOLIO.computeMetrics(trades, positions, new Date('2026-09-22T04:00:00Z'));
+  assert.equal(positions.length, 1);
+  assert.equal(positions[0].symbol, '2330');
+  assert.equal(positions[0].shares, 100);
+  assert.equal(metrics.closedCount, 0);
+});
+
+test('same-day sell closes the shares bought that day', () => {
+  const { RS_PORTFOLIO } = setup();
+  const buy = { symbol: '2330', side: 'buy', price: 100, shares: 100, date: '2026-09-10T18:00:00' };
+  const candidate = { symbol: '2330', price: 110, shares: 100, date: '2026-09-10T09:00:00' };
+  const trades = [{ ...candidate, side: 'sell' }, buy];
+  const positions = RS_PORTFOLIO.buildPositions(trades, {});
+  const metrics = RS_PORTFOLIO.computeMetrics(trades, positions, new Date('2026-09-22T04:00:00Z'));
+  assert.equal(positions.length, 0);
+  assert.equal(metrics.closedCount, 1);
+  assert.equal(RS_PORTFOLIO.matchedSellShares([buy], candidate), 100);
+});
+
+test('sell between two buys matches only the shares already owned', () => {
+  const { RS_PORTFOLIO } = setup();
+  const trades = [
+    { symbol: '2330', side: 'buy', price: 100, shares: 50, date: '2026-09-01' },
+    { symbol: '2330', side: 'buy', price: 100, shares: 50, date: '2026-09-10' },
+  ];
+  const candidate = { symbol: '2330', price: 110, shares: 100, date: '2026-09-05' };
+  assert.equal(RS_PORTFOLIO.matchedSellShares(trades, candidate), 50);
+});
+
 test('winning average uses only FIFO lots with pnl > 0', () => {
   const { RS_PORTFOLIO } = setup();
   const trades = [
