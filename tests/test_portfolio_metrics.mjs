@@ -96,18 +96,23 @@ test('MA100 is filled from closes without dropping pipeline MA50', () => {
   assert.equal(RS_CHART.lotsLabel(32580000), '32,580 張');
 });
 
-test('sample 2330 candle matches the mobile tooltip', () => {
+test('missing ohlcv is not filled with sample candles and minute range is gone', () => {
+  const preview = fs.readFileSync(path.join(ROOT, 'site/js/preview-demo.js'), 'utf8');
+  const app = fs.readFileSync(path.join(ROOT, 'site/js/app.js'), 'utf8');
+  const chart = fs.readFileSync(path.join(ROOT, 'site/js/chart.js'), 'utf8');
+  const html = fs.readFileSync(path.join(ROOT, 'site/index.html'), 'utf8');
+  assert.equal(preview.includes('sampleCandles'), false);
+  assert.equal(app.includes('sampleCandles'), false);
+  assert.equal(app.includes('示例資料'), false);
+  assert.equal(app.includes('尚無分線資料'), false);
+  assert.equal(html.includes('data-range="I"'), false);
+  assert.match(chart, /showEmpty\('無資料'\)/);
+  const ranges = html.slice(html.indexOf('id="chartRanges"'), html.indexOf('id="chartHost"'));
+  assert.equal(ranges.includes('>分<'), false);
+  assert.match(ranges, /data-range="D"/);
+  assert.match(ranges, /data-range="W"/);
+  assert.match(ranges, /data-range="M"/);
   const { RS_PREVIEW } = setup();
-  const bars = RS_PREVIEW.sampleCandles('2330');
-  const last = bars.at(-1);
-  const prev = bars.at(-2);
-  assert.equal(last.date, '2026-09-14');
-  assert.deepEqual(
-    { open: last.open, high: last.high, low: last.low, close: last.close },
-    { open: 968, high: 992, low: 964, close: 986 }
-  );
-  assert.equal(prev.close, 972);
-  assert.equal(last.volume / 1000, 32580);
-  assert.ok(bars.length >= 200);
-  assert.equal(RS_PREVIEW.sampleCandles('2454'), null);
+  assert.equal(RS_PREVIEW.sampleCandles, undefined);
+  assert.equal(typeof RS_PREVIEW.demoTrades, 'function');
 });

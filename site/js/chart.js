@@ -223,7 +223,7 @@ window.RS_CHART = (() => {
     );
 
     if (!rows.length) {
-      showEmpty('無 K 線資料');
+      showEmpty('無資料');
       return null;
     }
     if (!LW || typeof LW.createChart !== 'function') {
