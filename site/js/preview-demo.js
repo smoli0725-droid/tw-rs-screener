@@ -1,5 +1,5 @@
-// Sample journal + K-line used only when the signed-in user has no trades,
-// or when a symbol has no bundled OHLCV. Never written to localStorage / D1.
+// Closed-lot fixture for portfolio metric checks. Not shown in the app and
+// never written to localStorage / D1. Missing OHLCV is not filled with candles.
 window.RS_PREVIEW = (() => {
   function lot(symbol, buyDate, sellDate, buyPx, sellPx, shares = 100) {
     const name = '手記平倉';
@@ -40,91 +40,5 @@ window.RS_PREVIEW = (() => {
     return { 2330: 986, 2454: 1285, 2603: 179 };
   }
 
-  function mulberry32(seed) {
-    let a = seed >>> 0;
-    return () => {
-      a |= 0;
-      a = (a + 0x6d2b79f5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-
-  function businessDaysEnding(endIso, count) {
-    const [y, m, d] = endIso.split('-').map(Number);
-    const cursor = new Date(Date.UTC(y, m - 1, d));
-    const out = [];
-    while (out.length < count) {
-      const day = cursor.getUTCDay();
-      if (day !== 0 && day !== 6) out.push(cursor.toISOString().slice(0, 10));
-      cursor.setUTCDate(cursor.getUTCDate() - 1);
-    }
-    return out.reverse();
-  }
-
-  function roundPx(n) {
-    return Math.round(n * 100) / 100;
-  }
-
-  function buildSeries({ seed, endDate, endBar, prevClose, startPrice }) {
-    const rand = mulberry32(seed);
-    const dates = businessDaysEnding(endDate, 240);
-    const candles = [];
-    let price = startPrice;
-    for (let i = 0; i < dates.length - 2; i++) {
-      const drift = 0.0016;
-      const shock = (rand() - 0.46) * 0.02;
-      const close = Math.max(startPrice * 0.55, price * (1 + drift + shock));
-      const open = price * (1 + (rand() - 0.5) * 0.01);
-      const high = Math.max(open, close) * (1 + rand() * 0.008);
-      const low = Math.min(open, close) * (1 - rand() * 0.008);
-      const volume = Math.round((12000 + rand() * 28000) * 1000);
-      candles.push({
-        date: dates[i],
-        open: roundPx(open),
-        high: roundPx(high),
-        low: roundPx(low),
-        close: roundPx(close),
-        volume,
-      });
-      price = close;
-    }
-    const prev = {
-      date: dates[dates.length - 2],
-      open: roundPx(prevClose * 0.994),
-      high: roundPx(prevClose * 1.008),
-      low: roundPx(prevClose * 0.986),
-      close: prevClose,
-      volume: 28000000,
-    };
-    candles.push(prev);
-    candles.push({ date: endDate, ...endBar });
-    return candles;
-  }
-
-  function sampleCandles(symbol) {
-    const id = String(symbol);
-    if (id === '2330') {
-      return buildSeries({
-        seed: 2330,
-        endDate: '2026-09-14',
-        startPrice: 640,
-        prevClose: 972,
-        endBar: { open: 968, high: 992, low: 964, close: 986, volume: 32580000 },
-      });
-    }
-    if (id === '2603') {
-      return buildSeries({
-        seed: 2603,
-        endDate: '2026-09-14',
-        startPrice: 140,
-        prevClose: 181.2,
-        endBar: { open: 180.5, high: 183, low: 177.5, close: 179, volume: 18500000 },
-      });
-    }
-    return null;
-  }
-
-  return { demoTrades, demoPrices, sampleCandles };
+  return { demoTrades, demoPrices };
 })();

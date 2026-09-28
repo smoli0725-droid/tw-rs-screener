@@ -401,9 +401,9 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
       .join('');
   }
 
-  function applyChartSummary(summary, sample, pivot) {
+  function applyChartSummary(summary, pivot) {
     const rangeWord = { D: '日線', W: '週線', M: '月線' }[state.chartRange] || '日線';
-    const bits = [sample ? `${rangeWord} · 示例資料 · 非即時報價` : `${rangeWord} · 非即時報價`];
+    const bits = [`${rangeWord} · 非即時報價`];
     if (pivot) bits.push(`樞紐 ${fmt.money(Number(pivot))}`);
     $('#chartSub').textContent = bits.join(' · ');
     const lastEl = $('#chartLast');
@@ -420,9 +420,29 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     chgEl.className = `chart-chg ${fmt.pnlClass(summary.change)}`;
   }
 
-  function paintChart(raw, sample) {
+  function chartPivot() {
     const ctx = state.chartContext || {};
-    const pivot = ctx.pivot !== '' && ctx.pivot != null ? Number(ctx.pivot) : null;
+    return ctx.pivot !== '' && ctx.pivot != null ? Number(ctx.pivot) : null;
+  }
+
+  function chartPayloadIsEmpty(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return true;
+    if (!Array.isArray(raw.candles) || raw.candles.length === 0) return true;
+    return !raw.candles.some(
+      (c) => c && ['open', 'high', 'low', 'close'].every((k) => Number.isFinite(Number(c[k])))
+    );
+  }
+
+  function showNoChartData() {
+    state.chartOhlcv = { candles: [], annotations: [] };
+    const legend = $('#chartLegend');
+    if (legend) legend.textContent = '';
+    if (window.RS_CHART) RS_CHART.draw($('#chartHost'), state.chartOhlcv, null);
+    applyChartSummary(null, chartPivot());
+  }
+
+  function paintChart(raw) {
+    const pivot = chartPivot();
     const ohlcv = {
       candles: (raw.candles || []).map((c) => ({
         ...c,
@@ -434,17 +454,15 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
       annotations: raw.annotations || [],
     };
     state.chartOhlcv = ohlcv;
-    state.chartSample = sample;
     const summary = RS_CHART.draw($('#chartHost'), ohlcv, pivot);
     const legend = $('#chartLegend');
     if (legend) legend.textContent = '';
-    applyChartSummary(summary, sample, pivot);
+    applyChartSummary(summary, pivot);
   }
 
   async function openChart(id, name, market, pivot) {
     state.chartContext = { id, name, market, pivot };
     state.chartRange = 'D';
-    state.chartSample = false;
     $('#chartTitle').textContent = `${id} ${name || ''}`.trim();
     $('#chartSub').textContent = '載入 K 線…';
     $$('#chartRanges .chip').forEach((c) => c.classList.toggle('active', c.dataset.range === 'D'));
@@ -452,16 +470,13 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     $('#chartDialog').showModal();
     try {
       const raw = await RS_DATA.loadOhlcv(RS_STORAGE.getDataBaseUrl(), id);
-      paintChart(raw, false);
-    } catch (e) {
-      const candles = window.RS_PREVIEW && RS_PREVIEW.sampleCandles(id);
-      if (candles) {
-        paintChart({ candles, annotations: [] }, true);
+      if (chartPayloadIsEmpty(raw)) {
+        showNoChartData();
         return;
       }
-      RS_CHART.draw($('#chartHost'), { candles: [] }, null);
-      $('#chartLegend').textContent = `K 線載入失敗：${e.message}`;
-      applyChartSummary(null, false, null);
+      paintChart(raw);
+    } catch {
+      showNoChartData();
     }
   }
 
@@ -504,17 +519,12 @@ ${r.contraction ? esc(r.contraction) + ' · ' : ''}${r.base_weeks != null ? r.ba
     chartRanges.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-range]');
       if (!btn) return;
-      if (btn.dataset.range === 'I') {
-        toast('尚無分線資料');
-        return;
-      }
       state.chartRange = btn.dataset.range;
       $$('#chartRanges .chip').forEach((c) => c.classList.toggle('active', c === btn));
       RS_CHART.setRange(btn.dataset.range);
       if (!state.chartOhlcv) return;
-      const pivot = state.chartContext && state.chartContext.pivot;
       const summary = RS_CHART.redraw();
-      applyChartSummary(summary, state.chartSample, pivot);
+      applyChartSummary(summary, chartPivot());
     });
   }
   $$('#view-recommend .tab').forEach((tab) => {
