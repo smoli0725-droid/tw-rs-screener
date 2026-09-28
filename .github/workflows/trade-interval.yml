@@ -1,0 +1,24 @@
+name: Trade interval check
+
+on:
+  pull_request:
+
+jobs:
+  trade-interval-check:
+    name: overlapping trades
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas numpy pytest
+
+      - name: Reject overlapping trades in ledger and breakouts feed
+        run: python scripts/check_trade_intervals.py
+
+      - name: Unit test (日月光 overlap)
+        run: python -m pytest tests/test_trade_intervals.py -q
