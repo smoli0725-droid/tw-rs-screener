@@ -8,8 +8,12 @@
 * 失敗:突破後收盤 ≤ pivot × (1 - fail_pct)
 * 復甦:失敗後收盤回到 pivot 下方 0~near_pivot_pct → 重新列入「即將突破」;
   若再收過 pivot 則開一筆新交易。
-* 同代號仍有進行中時禁止再開:候選突破日若落在既有交易的進行區間
-  [breakout_date, outcome_date](含兩端;尚無 outcome_date 視為仍進行中),不得再開新單。
+* 同代號進行區間不得重疊。區間是 [breakout_date, outcome_date](含兩端;
+  尚無 outcome_date 視為仍進行中,右端開放)。新單會先結算,結算後的
+  整段區間若與既有交易相交就捨棄——不能只看候選突破日當天(回看窗可能
+  補進較早的穿越,其後段蓋住一筆突破日較晚的交易)。
+* 沒有另外的最短間隔天數。上一筆判定日的下一個交易日就可以開新單。
+  `breakout_window_bars` 只是找穿越的回看根數,不是兩筆交易的最小間距。
 
 市況 = 近 `window_days` 個交易日內,以「判定日」計的成功 ÷ (成功 + 失敗)。
 勝率 < 50% 視為市況不佳。仍在追蹤中的不計入分母,另列「進行中」。
@@ -165,6 +169,58 @@ def _symbol_occupied_on(trades: list[dict], sid: str, date_str: str) -> bool:
     return any(x.get("id") == sid and _trade_active_on(x, date_str) for x in trades)
 
 
+def _interval_end(trade: dict) -> str | None:
+    """判定日。空值代表仍進行中,區間右端開放。"""
+    end = trade.get("outcome_date")
+    return str(end)[:10] if end else None
+
+
+def trade_intervals_overlap(a: dict, b: dict) -> bool:
+    """兩筆交易的進行區間 [breakout_date, outcome_date] 是否相交(含端點)。
+
+    沒有 outcome_date 代表仍進行中。這不是固定天數的冷卻:
+    上一筆判定日的下一個交易日就可以開新單。
+    """
+    a0 = a.get("breakout_date")
+    b0 = b.get("breakout_date")
+    if not a0 or not b0:
+        return False
+    a0, b0 = str(a0)[:10], str(b0)[:10]
+    a1, b1 = _interval_end(a), _interval_end(b)
+    if b1 is not None and a0 > b1:
+        return False
+    if a1 is not None and b0 > a1:
+        return False
+    return True
+
+
+def overlapping_trade_pairs(trades: list[dict]) -> list[tuple[dict, dict]]:
+    """同一代號 `id` 的進行區間有交集的交易對。
+
+    比的是帳本代號,不看 yf_ticker 後綴。`.TW` / `.TWO` 只有在代號不同時
+    才會被當成兩檔;這個檢查不會另外用後綴合併或拆開。
+    沒有另外的最短間隔天數;`breakout_window_bars` 只決定回看幾根找穿越。
+    """
+    by_id: dict[str, list[dict]] = {}
+    pairs: list[tuple[dict, dict]] = []
+    for trade in trades:
+        sid = str(trade.get("id") or "")
+        if not sid:
+            continue
+        for prev in by_id.get(sid, []):
+            if trade_intervals_overlap(prev, trade):
+                pairs.append((prev, trade))
+        by_id.setdefault(sid, []).append(trade)
+    return pairs
+
+
+def _overlaps_same_symbol(trades: list[dict], candidate: dict) -> bool:
+    sid = candidate.get("id")
+    return any(
+        x.get("id") == sid and trade_intervals_overlap(x, candidate) for x in trades
+    )
+
+
 # ---------------------------------------------------------------- core
 def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
                   data_date: str, p: PatternParams = PARAMS,
@@ -207,6 +263,9 @@ def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
                           for x in trades + new_trades)
             if not occupied and not already:
                 nt = _open_trade(t, s, pivot, data_date, p, origin="recovered")
+                # 復甦單的突破日是 data_date,仍用結算後的整段區間把關。
+                if nt and _overlaps_same_symbol(trades + new_trades, nt):
+                    nt = None
                 if nt:
                     new_trades.append(nt)
             t["status"] = TRADE_REENTERED
@@ -252,6 +311,12 @@ def update_ledger(ledger: dict, hits: list[dict], close_df: pd.DataFrame,
             "rs": hit.get("RS") or hit.get("rs"),
         }
         nt = _open_trade(meta, s, pivot, bdate, p, origin="pattern", breakout_idx=bi)
+        # 候選日當天落在空檔還不夠。_find_cross 的回看窗可以補進較早的穿越,
+        # _open_trade 會立刻用其後收盤結算;若這段 [突破日, 判定日] 蓋住
+        # 一筆突破日較晚的既有交易(同一次更新可能已先把那筆判結束),仍捨棄。
+        # 沒有另外的最短間隔天數:判定日次一交易日、且結算後不相交,就可以開。
+        if nt and _overlaps_same_symbol(trades, nt):
+            nt = None
         if nt:
             trades.append(nt)
 

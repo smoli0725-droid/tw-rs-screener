@@ -78,6 +78,10 @@ jobs:
         if: ${{ steps.skip.outputs.skip != 'true' && steps.closed.outputs.closed != 'true' }}
         run: python rs_calculator.py
 
+      - name: Reject overlapping trades before commit
+        if: ${{ steps.skip.outputs.skip != 'true' && steps.closed.outputs.closed != 'true' }}
+        run: python scripts/check_trade_intervals.py
+
       - name: Commit results
         if: ${{ steps.skip.outputs.skip != 'true' && steps.closed.outputs.closed != 'true' }}
         run: |
