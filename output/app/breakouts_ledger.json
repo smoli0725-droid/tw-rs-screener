@@ -251,8 +251,8 @@
    "outcome_pct": -9.66,
    "peak_close": 88.0,
    "trough_close": 79.5,
-   "last_date": "2026-09-30",
-   "last_close": 75.6
+   "last_date": "2026-09-29",
+   "last_close": 76.1
   },
   {
    "trade_id": "3094-2026-08-28-39",
@@ -527,8 +527,8 @@
    "outcome_pct": -7.31,
    "peak_close": 81.4,
    "trough_close": 72.3,
-   "last_date": "2026-09-30",
-   "last_close": 73.0
+   "last_date": "2026-09-29",
+   "last_close": 71.2
   },
   {
    "trade_id": "3406-2026-09-04-1055",
@@ -803,8 +803,8 @@
    "outcome_pct": -5.16,
    "peak_close": 26.85,
    "trough_close": 23.9,
-   "last_date": "2026-09-30",
-   "last_close": 24.9
+   "last_date": "2026-09-29",
+   "last_close": 24.35
   },
   {
    "trade_id": "3406-2026-09-09-1055",
@@ -1010,8 +1010,8 @@
    "outcome_pct": -10.55,
    "peak_close": 1030.0,
    "trough_close": 890.0,
-   "last_date": "2026-09-30",
-   "last_close": 927.0
+   "last_date": "2026-09-29",
+   "last_close": 929.0
   },
   {
    "trade_id": "6933-2026-09-09-331",
@@ -1355,8 +1355,8 @@
    "outcome_pct": -5.56,
    "peak_close": 315.0,
    "trough_close": 297.5,
-   "last_date": "2026-09-30",
-   "last_close": 288.5
+   "last_date": "2026-09-29",
+   "last_close": 297.5
   },
   {
    "trade_id": "6538-2026-09-16-372.5",
@@ -1612,6 +1612,29 @@
    "last_close": 140.0
   },
   {
+   "trade_id": "3702-2026-09-18-112",
+   "id": "3702",
+   "name": "大聯大",
+   "market": "上市",
+   "pattern": "作弊型態",
+   "pattern_label": "作弊型態",
+   "yf_ticker": "3702.TW",
+   "rs": 87,
+   "pivot": 112.0,
+   "breakout_date": "2026-09-18",
+   "breakout_close": 114.5,
+   "origin": "pattern",
+   "status": "active",
+   "outcome": null,
+   "outcome_date": null,
+   "outcome_close": null,
+   "outcome_pct": null,
+   "peak_close": 117.5,
+   "trough_close": 113.0,
+   "last_date": "2026-09-29",
+   "last_close": 115.0
+  },
+  {
    "trade_id": "3711-2026-09-18-628",
    "id": "3711",
    "name": "日月光投控",
@@ -1654,8 +1677,8 @@
    "outcome_pct": -7.87,
    "peak_close": 243.5,
    "trough_close": 222.5,
-   "last_date": "2026-09-30",
-   "last_close": 207.0
+   "last_date": "2026-09-29",
+   "last_close": 205.5
   },
   {
    "trade_id": "6538-2026-09-18-388",
@@ -2711,7 +2734,7 @@
    "date": "2026-09-30",
    "wins": 26,
    "losses": 9,
-   "pending": 47,
+   "pending": 48,
    "win_rate": 0.743,
    "label": "市況良好"
   }
@@ -2723,7 +2746,7 @@
   "window_start": "2026-09-15",
   "wins": 26,
   "losses": 9,
-  "pending": 47,
+  "pending": 48,
   "recovered": 1,
   "win_rate": 0.743,
   "label": "市況良好",
