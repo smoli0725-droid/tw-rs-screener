@@ -1,10 +1,10 @@
 {
   "data_date": "2026-10-01",
-  "generated_at": "2026-10-02T02:34:55.328971+08:00",
+  "generated_at": "2026-10-02T02:49:16.257876+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-10-02T02:34:48.819632+08:00",
-  "message": "今日盤未收(台北 02:34),沿用 2026-10-01",
+  "source_checked_at": "2026-10-02T02:49:07.624920+08:00",
+  "message": "今日盤未收(台北 02:49),沿用 2026-10-01",
   "twse_cross_check": {
     "ok": true,
     "reason": "before_session_close",
@@ -25,7 +25,7 @@
     "patterns": 37,
     "pattern_symbols": 37,
     "near_breakout": 14,
-    "broke_out": 12,
+    "broke_out": 11,
     "ohlcv_symbols": 115,
     "universe": 1962
   },
@@ -36,7 +36,7 @@
     "wins": 30,
     "losses": 3,
     "pending": 54,
-    "recovered": 1,
+    "recovered": 2,
     "win_rate": 0.909,
     "label": "市況良好",
     "rules": {
