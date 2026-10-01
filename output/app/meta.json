@@ -1,16 +1,14 @@
 {
   "data_date": "2026-10-01",
-  "generated_at": "2026-10-01T17:22:02.313568+08:00",
+  "generated_at": "2026-10-02T00:43:49.513894+08:00",
   "is_fresh": true,
-  "is_trading_day": true,
-  "source_checked_at": "2026-10-01T17:21:52.552478+08:00",
-  "message": "fresh（TWSE 快照 2026-09-30 尚未更新,略過交叉比價）",
+  "is_trading_day": false,
+  "source_checked_at": "2026-10-02T00:43:43.058546+08:00",
+  "message": "今日盤未收(台北 00:43),沿用 2026-10-01",
   "twse_cross_check": {
     "ok": true,
-    "skipped": true,
-    "reason": "twse_stale",
-    "twse_date": "2026-09-30",
-    "mismatches": []
+    "reason": "before_session_close",
+    "twse_date": "2026-09-30"
   },
   "price_overlay": {
     "applied": false,
@@ -24,11 +22,11 @@
   },
   "counts": {
     "rs85": 291,
-    "patterns": 35,
-    "pattern_symbols": 35,
-    "near_breakout": 13,
-    "broke_out": 10,
-    "ohlcv_symbols": 114,
+    "patterns": 34,
+    "pattern_symbols": 34,
+    "near_breakout": 8,
+    "broke_out": 15,
+    "ohlcv_symbols": 110,
     "universe": 1962
   },
   "market": {
@@ -38,7 +36,7 @@
     "wins": 30,
     "losses": 3,
     "pending": 54,
-    "recovered": 2,
+    "recovered": 1,
     "win_rate": 0.909,
     "label": "市況良好",
     "rules": {
