@@ -257,6 +257,8 @@ def test_trading_day_late_data_still_exits_2(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr("rs_calculator.fetch_index", lambda: twii)
     monkeypatch.setattr("rs_calculator.fetch_twse_day_all", lambda: twse)
     monkeypatch.setattr("rs_calculator.fetch_twse_taiex", lambda: (dt.date(2026, 9, 4), 46551.0))
+    monkeypatch.setattr("rs_calculator.fetch_twse_mi_index", lambda day: (None, None))
+    monkeypatch.setattr("rs_calculator.fetch_tpex_day_all", lambda: None)
 
     real_check = rs_calculator.check_freshness
 

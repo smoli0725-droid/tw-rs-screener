@@ -16,6 +16,9 @@ from rs_calculator import (
     apply_twse_snapshot,
     check_freshness,
     drop_incomplete_tail,
+    parse_tpex_day_all,
+    parse_twse_mi_index,
+    resolve_same_day_prices,
     fetch_neo_day_all,
     _parse_twse_date,
     _twse_snapshot_date,
@@ -255,6 +258,72 @@ def test_check_freshness_does_not_compare_mismatched_dates(monkeypatch):
     assert r["is_fresh"] is True
     assert r["twse_cross_check"]["skipped"] is True
     assert r["twse_cross_check"]["mismatches"] == []
+
+
+_MI_INDEX_1005 = {
+    "stat": "OK",
+    "date": "20261005",
+    "tables": [
+        {"title": "價格指數", "fields": ["指數", "收盤指數", "漲跌(+/-)"],
+         "data": [["寶島股價指數", "55,145.96", "+"], ["發行量加權股價指數", "49,712.04", "+"]]},
+        {"title": "每日收盤行情",
+         "fields": ["證券代號", "證券名稱", "成交股數", "成交筆數", "成交金額", "開盤價",
+                    "最高價", "最低價", "收盤價", "漲跌(+/-)"],
+         "data": [["2330", "台積電", "26,800,187", "1", "1", "2,550.00", "2,580.00",
+                   "2,545.00", "2,575.00", "+"],
+                  ["2317", "鴻海", "--", "0", "0", "--", "--", "--", "--", ""]]},
+    ],
+}
+
+_TPEX_1005 = [
+    {"Date": "1151005", "SecuritiesCompanyCode": "6488", "Close": "120.00",
+     "Open": "112.00", "High": "121.00", "Low": "111.00", "TradingShares": "12194388"},
+]
+
+
+def test_parse_twse_mi_index_and_tpex():
+    df, taiex = parse_twse_mi_index(_MI_INDEX_1005, dt.date(2026, 10, 5))
+    assert taiex == 49712.04
+    assert _twse_snapshot_date(df) == dt.date(2026, 10, 5)
+    row = df[df["Code"] == "2330"].iloc[0]
+    assert row["ClosingPrice"] == "2,575.00"
+    # 日期不符就不用
+    assert parse_twse_mi_index(_MI_INDEX_1005, dt.date(2026, 10, 6)) == (None, None)
+    tp = parse_tpex_day_all(_TPEX_1005)
+    assert _twse_snapshot_date(tp) == dt.date(2026, 10, 5)
+    assert tp.iloc[0]["Code"] == "6488"
+
+
+def test_resolve_falls_back_to_mi_index_and_tpex(monkeypatch):
+    """2026-10-06 01:10:STOCK_DAY_ALL 停在 10/2、Yahoo 沒有 10/5 → 用 MI_INDEX + 櫃買補 10/5。"""
+    now = dt.datetime(2026, 10, 6, 1, 10, tzinfo=TAIPEI_TZ)
+    ohlcv, close, volume, twii = _market(dt.date(2026, 10, 2), n=3)
+    stale = _twse_day_all("1151002", {"2330": "2500.00"})
+    monkeypatch.setattr("rs_calculator.fetch_twse_day_all", lambda: stale)
+    monkeypatch.setattr("rs_calculator.fetch_twse_taiex", lambda: (dt.date(2026, 10, 2), 48475.0))
+    asked = []
+
+    def mi_index(day):
+        asked.append(day)
+        return parse_twse_mi_index(_MI_INDEX_1005, day)
+
+    monkeypatch.setattr("rs_calculator.fetch_twse_mi_index", mi_index)
+    monkeypatch.setattr("rs_calculator.fetch_tpex_day_all", lambda: parse_tpex_day_all(_TPEX_1005))
+    monkeypatch.setattr("rs_calculator.previous_session", lambda today: dt.date(2026, 10, 5))
+    o2, c2, v2, t2, twse, overlay = resolve_same_day_prices(
+        ohlcv, close, volume, twii, now=now)
+    assert asked == [dt.date(2026, 10, 5)]
+    assert pd.Timestamp(c2.index[-1]).date() == dt.date(2026, 10, 5)
+    assert float(c2["2330.TW"].iloc[-1]) == 2575.0
+    assert pd.isna(c2["2317.TW"].iloc[-1])          # 沒成交的不補
+    assert float(c2["6488.TWO"].iloc[-1]) == 120.0
+    assert float(o2["High"]["6488.TWO"].iloc[-1]) == 121.0
+    assert float(t2.iloc[-1]) == 49712.04
+    assert overlay["otc_filled"] == 1
+    r = check_freshness(c2, t2, today=now.date(), now=now, skip=False, twse=twse,
+                        overlay=overlay, prev_session=dt.date(2026, 10, 5))
+    assert r["is_fresh"] is True
+    assert r["data_date"] == "2026-10-05"
 
 
 def test_neo_extension_point_is_noop():

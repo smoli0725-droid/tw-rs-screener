@@ -41,6 +41,11 @@ from market_calendar import ensure_market_open, previous_session
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
 TWSE_DAY_ALL = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
 TWSE_MI_INDEX = "https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX"
+# 備援:OpenAPI STOCK_DAY_ALL 常比網站晚好幾個小時換日。網站 rwd 版可指定日期。
+TWSE_MI_INDEX_RWD = ("https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX"
+                     "?date={ymd}&type=ALLBUT0999&response=json")
+TPEX_DAY_ALL = "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes"
+HTTP_HEADERS = {"User-Agent": "tw-rs-screener/prices"}
 EXCLUDE_INDUSTRY = {"ETF", "ETN", "受益證券", "存託憑證", "上市指數投資證券(ETN)"}
 TRADING_DAYS = {"3m": 63, "6m": 126, "9m": 189, "12m": 252}
 MIN_HISTORY = 130        # 至少約半年資料才納入 RS 排名
@@ -55,6 +60,7 @@ TAIPEI_TZ = dt.timezone(dt.timedelta(hours=8))
 #   2. Yahoo Finance — history + TPEX (.TWO); lags after 13:30 close
 #   3. Fubon Neo — not implemented; see fetch_neo_day_all()
 PRICE_SOURCE_TWSE = "twse"
+PRICE_SOURCE_TPEX = "tpex"
 PRICE_SOURCE_YAHOO = "yahoo"
 PRICE_SOURCE_NEO = "neo"  # reserved; do not log in / scrape Neo in this module
 
@@ -195,6 +201,87 @@ def fetch_twse_taiex() -> tuple[dt.date | None, float | None]:
     return None, None
 
 
+def _get_json(url: str, tries: int = 3, timeout: int = 30):
+    import time
+    import requests
+    last = None
+    for i in range(tries):
+        try:
+            r = requests.get(url, headers=HTTP_HEADERS, timeout=timeout)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:  # 連線重設、證交所偶發擋頁
+            last = e
+            time.sleep(2 * (i + 1))
+    raise last
+
+
+def parse_twse_mi_index(payload: dict, day: dt.date):
+    """證交所網站 MI_INDEX(指定日期)→ (STOCK_DAY_ALL 欄位的 DataFrame, 加權指數收盤)。"""
+    if not isinstance(payload, dict) or payload.get("stat") != "OK":
+        return None, None
+    if _parse_twse_date(payload.get("date")) != day:
+        return None, None
+    rows, taiex = [], None
+    for table in payload.get("tables") or []:
+        fields = table.get("fields") or []
+        data = table.get("data") or []
+        if fields[:2] == ["指數", "收盤指數"] and taiex is None:
+            for row in data:
+                if row and row[0] == "發行量加權股價指數":
+                    taiex = _parse_twse_price(row[1])
+        if "證券代號" in fields and "收盤價" in fields:
+            ix = {name: fields.index(name) for name in
+                  ("證券代號", "開盤價", "最高價", "最低價", "收盤價", "成交股數")}
+            for row in data:
+                rows.append({
+                    "Date": day.strftime("%Y%m%d"),
+                    "Code": str(row[ix["證券代號"]]).strip(),
+                    "OpeningPrice": row[ix["開盤價"]],
+                    "HighestPrice": row[ix["最高價"]],
+                    "LowestPrice": row[ix["最低價"]],
+                    "ClosingPrice": row[ix["收盤價"]],
+                    "TradeVolume": row[ix["成交股數"]],
+                })
+    df = pd.DataFrame(rows) if rows else None
+    return df, taiex
+
+
+def fetch_twse_mi_index(day: dt.date):
+    """指定日期的上市收盤(證交所網站)。失敗回傳 (None, None)。"""
+    try:
+        payload = _get_json(TWSE_MI_INDEX_RWD.format(ymd=day.strftime("%Y%m%d")))
+        return parse_twse_mi_index(payload, day)
+    except Exception as e:
+        print(f"[prices] TWSE MI_INDEX {day} 失敗: {e}", flush=True)
+        return None, None
+
+
+def parse_tpex_day_all(payload) -> pd.DataFrame | None:
+    """櫃買 OpenAPI 上櫃收盤 → STOCK_DAY_ALL 欄位。"""
+    if not isinstance(payload, list) or not payload:
+        return None
+    rows = [{
+        "Date": row.get("Date"),
+        "Code": str(row.get("SecuritiesCompanyCode", "")).strip(),
+        "OpeningPrice": row.get("Open"),
+        "HighestPrice": row.get("High"),
+        "LowestPrice": row.get("Low"),
+        "ClosingPrice": row.get("Close"),
+        "TradeVolume": row.get("TradingShares"),
+    } for row in payload if isinstance(row, dict)]
+    return pd.DataFrame(rows) if rows else None
+
+
+def fetch_tpex_day_all() -> pd.DataFrame | None:
+    """上櫃最新一日收盤。失敗回傳 None。"""
+    try:
+        return parse_tpex_day_all(_get_json(TPEX_DAY_ALL, timeout=60))
+    except Exception as e:
+        print(f"[prices] TPEX OpenAPI 失敗: {e}", flush=True)
+        return None
+
+
 def fetch_neo_day_all() -> pd.DataFrame | None:
     """Fubon Neo same-day quotes — not implemented.
 
@@ -314,8 +401,14 @@ def _sample_price_mismatches(close: pd.DataFrame, twse: pd.DataFrame,
 def apply_twse_snapshot(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
                         twii: pd.Series, twse: pd.DataFrame | None,
                         today: dt.date | None = None,
-                        taiex_close: float | None = None) -> tuple:
+                        taiex_close: float | None = None,
+                        suffix: str = ".TW",
+                        source: str = PRICE_SOURCE_TWSE,
+                        yahoo_last: dt.date | None = None) -> tuple:
     """用 TWSE 官方 OHLCV 覆蓋/補上市股最後一根。
+
+    suffix=".TWO"、source=tpex 時同一套邏輯套用櫃買收盤。yahoo_last 是 Yahoo
+    原始最後日期(先套上市再套上櫃時,上櫃要拿套用前的日期判斷)。
 
     快照日期 == 台北「今天」時套用;午夜後延遲的排程,快照若是 Yahoo 還沒有的
     上一交易日(Yahoo 最後日期 < 快照日期 < 今天)也套用,補上漏掉的那一根。
@@ -350,7 +443,8 @@ def apply_twse_snapshot(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
     if twse_date is None:
         overlay["message"] = "twse_date_unparsed"
         return ohlcv, close, volume, twii, overlay
-    yahoo_last = pd.Timestamp(close.index[-1]).date()
+    if yahoo_last is None:
+        yahoo_last = pd.Timestamp(close.index[-1]).date()
     catch_up = yahoo_last < twse_date < today
     if twse_date != today and not catch_up:
         overlay["message"] = "twse_not_today"
@@ -375,7 +469,7 @@ def apply_twse_snapshot(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
     filled = 0
     for _, row in twse.iterrows():
         code = str(row.get("Code", "")).strip()
-        ticker = f"{code}.TW"
+        ticker = f"{code}{suffix}"
         if ticker not in close.columns:
             continue
         cpx = _parse_twse_price(row.get("ClosingPrice"))
@@ -408,7 +502,7 @@ def apply_twse_snapshot(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
         overlay["taiex_filled"] = True
 
     overlay["applied"] = filled > 0
-    overlay["source"] = PRICE_SOURCE_TWSE if filled else None
+    overlay["source"] = source if filled else None
     overlay["listed_filled"] = filled
     overlay["message"] = "appended" if appended and filled else (
         "overlaid" if filled else "twse_today_no_overlap"
@@ -416,17 +510,61 @@ def apply_twse_snapshot(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
     return ohlcv, close, volume, twii, overlay
 
 
+def target_session(now: dt.datetime) -> dt.date:
+    """應該要有收盤的交易日:14:00 後是今天,之前是上一交易日。"""
+    today = now.date()
+    if now.time() >= dt.time(14, 0):
+        return today
+    try:
+        return previous_session(today)
+    except Exception as exc:
+        print(f"[prices] 上一交易日判斷失敗: {exc}", flush=True)
+        return today
+
+
 def resolve_same_day_prices(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
-                            twii: pd.Series, today: dt.date | None = None):
-    """Yahoo 歷史 + TWSE 當日上市收盤。Neo 帳號就緒後在此接入 fetch_neo_day_all()。"""
-    today = today or taipei_today()
+                            twii: pd.Series, today: dt.date | None = None,
+                            now: dt.datetime | None = None):
+    """Yahoo 歷史 + 官方收盤補最後一根。
+
+    上市:OpenAPI STOCK_DAY_ALL;它還沒換到目標交易日時,改抓證交所網站 MI_INDEX
+    (可指定日期,通常盤後一小時內就有)。上櫃:櫃買 OpenAPI。
+    Neo 帳號就緒後在此接入 fetch_neo_day_all()。
+    """
+    now = now or dt.datetime.now(TAIPEI_TZ)
+    today = today or now.date()
+    yahoo_last = pd.Timestamp(close.index[-1]).date() if len(close.index) else None
+    target = target_session(now)
     twse = fetch_twse_day_all()
     # neo = fetch_neo_day_all()  # future: overlay listed + TPEX when neo date == today
     taiex_date, taiex_px = fetch_twse_taiex()
     twse_date = _twse_snapshot_date(twse) if twse is not None else None
+    if (yahoo_last is None or yahoo_last < target) and (twse_date is None or twse_date < target):
+        alt, alt_taiex = fetch_twse_mi_index(target)
+        if alt is not None and not alt.empty:
+            print(f"[prices] STOCK_DAY_ALL 停在 {twse_date},改用證交所 MI_INDEX {target}",
+                  flush=True)
+            twse, twse_date = alt, target
+            if alt_taiex:
+                taiex_date, taiex_px = target, alt_taiex
     taiex_close = taiex_px if taiex_date is not None and taiex_date in (today, twse_date) else None
     ohlcv, close, volume, twii, overlay = apply_twse_snapshot(
-        ohlcv, close, volume, twii, twse, today=today, taiex_close=taiex_close)
+        ohlcv, close, volume, twii, twse, today=today, taiex_close=taiex_close,
+        yahoo_last=yahoo_last)
+
+    tpex = fetch_tpex_day_all()
+    ohlcv, close, volume, twii, tpex_meta = apply_twse_snapshot(
+        ohlcv, close, volume, twii, tpex, today=today, suffix=".TWO",
+        source=PRICE_SOURCE_TPEX, yahoo_last=yahoo_last)
+    overlay["tpex_date"] = tpex_meta.get("twse_date")
+    overlay["otc_filled"] = tpex_meta.get("listed_filled", 0)
+    if tpex_meta.get("applied"):
+        overlay["appended_row"] = overlay["appended_row"] or tpex_meta["appended_row"]
+        print(f"[prices] TPEX overlay {tpex_meta['message']} otc={tpex_meta['listed_filled']} "
+              f"tpex_date={tpex_meta['twse_date']}", flush=True)
+    elif tpex_meta.get("twse_date"):
+        print(f"[prices] TPEX snapshot {tpex_meta['twse_date']} ({tpex_meta['message']})",
+              flush=True)
     if overlay.get("applied"):
         print(
             f"[prices] TWSE overlay {overlay['message']} "
