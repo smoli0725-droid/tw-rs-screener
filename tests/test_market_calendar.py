@@ -274,3 +274,10 @@ def test_trading_day_late_data_still_exits_2(monkeypatch, capsys, tmp_path):
     out = capsys.readouterr().out
     assert "資料尚未更新" in out
     assert "休市，略過" not in out
+
+
+def test_previous_session_skips_weekend_and_closures():
+    closures = {dt.date(2026, 10, 9): "國慶日"}
+    assert market_calendar.previous_session(dt.date(2026, 10, 6), closures=closures) == dt.date(2026, 10, 5)
+    assert market_calendar.previous_session(dt.date(2026, 10, 5), closures=closures) == dt.date(2026, 10, 2)
+    assert market_calendar.previous_session(dt.date(2026, 10, 12), closures=closures) == dt.date(2026, 10, 8)

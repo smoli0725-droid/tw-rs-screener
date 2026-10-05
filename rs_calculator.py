@@ -36,7 +36,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from market_calendar import ensure_market_open
+from market_calendar import ensure_market_open, previous_session
 
 FINMIND_URL = "https://api.finmindtrade.com/api/v4/data"
 TWSE_DAY_ALL = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
@@ -46,6 +46,9 @@ TRADING_DAYS = {"3m": 63, "6m": 126, "9m": 189, "12m": 252}
 MIN_HISTORY = 130        # 至少約半年資料才納入 RS 排名
 MIN_AVG_VOL_ZHANG = 200  # 樣板名單的 20 日均量門檻(張),依個人資金規模調整
 FRESHNESS_SAMPLE_IDS = ("2330", "2317", "2454")
+# Yahoo 盤後常先給一列只有成交量、OHLC 全是 NaN 的當日列。收盤覆蓋率低於
+# 這個比例的尾端列視為未完成,在新鮮度判斷前剔除。
+MIN_ROW_COVERAGE = 0.5
 TAIPEI_TZ = dt.timezone(dt.timedelta(hours=8))
 # Same-day close sources (priority when wiring new ones):
 #   1. TWSE STOCK_DAY_ALL — listed official unadjusted OHLCV (implemented)
@@ -121,6 +124,37 @@ def fetch_index() -> pd.Series:
     if isinstance(twii, pd.DataFrame):
         twii = twii.iloc[:, 0]
     return twii.sort_index()
+
+
+def drop_incomplete_tail(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
+                         twii: pd.Series, min_coverage: float = MIN_ROW_COVERAGE):
+    """剔除尾端收盤覆蓋率不足的列(Yahoo 半成品當日列)。
+
+    不剔除的話 close.index[-1] 會是新日期,新鮮度判成已更新,但每檔 dropna
+    後最後一根仍是前一交易日,App K 線停在舊日期。
+    回傳 (ohlcv, close, volume, twii, dropped_dates)。
+    """
+    dropped: list[dt.date] = []
+    if close is None or close.empty:
+        return ohlcv, close, volume, twii, dropped
+    coverage = close.notna().mean(axis=1)
+    keep = len(close)
+    while keep > 0 and coverage.iloc[keep - 1] < min_coverage:
+        keep -= 1
+    if keep < len(close):
+        dropped = [pd.Timestamp(ts).date() for ts in close.index[keep:]]
+        last = close.index[keep - 1] if keep else None
+        ohlcv = {k: (df.loc[:last] if last is not None else df.iloc[:0])
+                 for k, df in ohlcv.items()}
+        close = ohlcv["Close"]
+        volume = ohlcv["Volume"]
+        print(f"[prices] Yahoo 未完成列已剔除: {[d.isoformat() for d in dropped]}",
+              flush=True)
+    if twii is not None and not twii.empty:
+        twii = twii.loc[:twii.last_valid_index()] if twii.notna().any() else twii.iloc[:0]
+        if close is not None and len(close.index):
+            twii = twii.loc[:close.index[-1]]
+    return ohlcv, close, volume, twii, dropped
 
 
 # ---------------------------------------------------------------- 資料新鮮度
@@ -281,9 +315,11 @@ def apply_twse_snapshot(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
                         twii: pd.Series, twse: pd.DataFrame | None,
                         today: dt.date | None = None,
                         taiex_close: float | None = None) -> tuple:
-    """用 TWSE 當日官方 OHLCV 覆蓋/補上市股最後一根。
+    """用 TWSE 官方 OHLCV 覆蓋/補上市股最後一根。
 
-    只在快照日期 == 台北「今天」時套用,避免把昨日 TWSE 寫進 Yahoo 已有的今日列。
+    快照日期 == 台北「今天」時套用;午夜後延遲的排程,快照若是 Yahoo 還沒有的
+    上一交易日(Yahoo 最後日期 < 快照日期 < 今天)也套用,補上漏掉的那一根。
+    快照比 Yahoo 舊時不套用,避免把昨日 TWSE 寫進 Yahoo 已有的今日列。
     上櫃 (.TWO) 不在 STOCK_DAY_ALL,維持 Yahoo;若補了新的一日列,上櫃該列為 NaN
     (RS 計算會 ffill,型態偵測 dropna 後沿用上一根)。
 
@@ -314,7 +350,9 @@ def apply_twse_snapshot(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFrame,
     if twse_date is None:
         overlay["message"] = "twse_date_unparsed"
         return ohlcv, close, volume, twii, overlay
-    if twse_date != today:
+    yahoo_last = pd.Timestamp(close.index[-1]).date()
+    catch_up = yahoo_last < twse_date < today
+    if twse_date != today and not catch_up:
         overlay["message"] = "twse_not_today"
         return ohlcv, close, volume, twii, overlay
 
@@ -385,7 +423,8 @@ def resolve_same_day_prices(ohlcv: dict, close: pd.DataFrame, volume: pd.DataFra
     twse = fetch_twse_day_all()
     # neo = fetch_neo_day_all()  # future: overlay listed + TPEX when neo date == today
     taiex_date, taiex_px = fetch_twse_taiex()
-    taiex_close = taiex_px if taiex_date == today else None
+    twse_date = _twse_snapshot_date(twse) if twse is not None else None
+    taiex_close = taiex_px if taiex_date is not None and taiex_date in (today, twse_date) else None
     ohlcv, close, volume, twii, overlay = apply_twse_snapshot(
         ohlcv, close, volume, twii, twse, today=today, taiex_close=taiex_close)
     if overlay.get("applied"):
@@ -406,14 +445,16 @@ def check_freshness(close: pd.DataFrame, twii: pd.Series,
                     skip: bool = False,
                     twse: pd.DataFrame | None = None,
                     overlay: dict | None = None,
-                    now: dt.datetime | None = None) -> dict:
+                    now: dt.datetime | None = None,
+                    prev_session: dt.date | None = None) -> dict:
     """確認價格序列已是當日交易日。
 
     Yahoo 已是今天時不因 TWSE 抽樣價差 >3% 擋下(還原價 vs 未還原、或已 overlay)。
     只在 TWSE 快照日期 == 價格序列最後日期時比價,且比價僅供紀錄。
     Yahoo 仍為昨日時:若 TWSE 已是今日,應先走 apply_twse_snapshot;套用失敗才重試。
     平日 14:00 後且 Yahoo/TWSE 都還沒有今日檔 → is_fresh=False,等備援時段。
-    GitHub cron 若拖過午夜,台北 14:00 前仍接受上一交易日(今日盤未收)。
+    GitHub cron 若拖過午夜,台北 14:00 前仍接受上一交易日(今日盤未收),
+    但價格序列必須已經有上一交易日(prev_session),否則等下一個時段。
     """
     now = now or dt.datetime.now(TAIPEI_TZ)
     if now.tzinfo is None:
@@ -498,6 +539,24 @@ def check_freshness(close: pd.DataFrame, twii: pd.Series,
     # Delayed schedule past midnight: next calendar day, but today's session
     # has not closed. Accept last session instead of failing the late slot.
     if now.date() == today and now.time() < dt.time(14, 0) and twse_date != today:
+        if prev_session is None:
+            try:
+                prev_session = previous_session(today)
+            except Exception as exc:
+                print(f"[freshness] 上一交易日判斷失敗: {exc}", flush=True)
+        if prev_session is not None and data_date < prev_session:
+            result["is_trading_day"] = True
+            result["is_fresh"] = False
+            result["message"] = (
+                f"上一交易日({prev_session})收盤尚未進來"
+                f"（Yahoo {data_date}, TWSE {twse_date}）,請稍後重試"
+            )
+            result["twse_cross_check"] = {
+                "ok": False,
+                "reason": "prev_session_missing",
+                "twse_date": twse_date.isoformat() if twse_date else None,
+            }
+            return result
         result["is_trading_day"] = False
         result["is_fresh"] = True
         result["message"] = f"今日盤未收(台北 {now.strftime('%H:%M')}),沿用 {data_date}"
@@ -709,6 +768,7 @@ def main():
         print(f"股票池:{len(uni)} 檔(上市 {sum(uni['市場']=='上市')}、上櫃 {sum(uni['市場']=='上櫃')})")
         ohlcv, close, volume = fetch_prices(uni["yf_ticker"].tolist())
         twii = fetch_index()
+        ohlcv, close, volume, twii, _ = drop_incomplete_tail(ohlcv, close, volume, twii)
         if args.skip_freshness:
             freshness = check_freshness(close, twii, skip=True)
         else:
