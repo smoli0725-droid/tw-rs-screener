@@ -67,7 +67,9 @@ gh workflow run daily_rs.yml --repo smoli0725-droid/tw-rs-screener
 2. **TWSE OpenAPI `STOCK_DAY_ALL`**:上市官方未還原 OHLCV;快照日期已是今天時,覆蓋/補上上市最後一根,並嘗試用 `MI_INDEX` 的發行量加權補 `^TWII`
 3. **富邦 Neo**(尚未實作):帳號就緒後在 `rs_calculator.fetch_neo_day_all()` 接入,可同時補上市+上櫃;憑證只放 Actions secrets
 
-上櫃不在 TWSE 快照裡,Yahoo 若還沒今日檔,TPEX 當日列會是空的(RS 會 ffill 成昨日收盤;型態偵測沿用上一根)。除權息當日,TWSE 未還原收盤與 Yahoo 還原歷史拼在同一序列,單日報酬可能有落差。
+**備援**:OpenAPI `STOCK_DAY_ALL` 常比證交所網站晚好幾個小時換日。它還沒有目標交易日(14:00 後為今天,之前為上一交易日)時,改抓證交所網站 `rwd/zh/afterTrading/MI_INDEX?date=YYYYMMDD`(可指定日期,含加權指數)補上市;上櫃則用櫃買 OpenAPI `tpex_mainboard_daily_close_quotes` 補 `.TWO`。只補 Yahoo 還沒有的日期(或今天),不覆蓋更新的資料。
+
+若櫃買 OpenAPI 也還沒有,上櫃不在 TWSE 快照裡,Yahoo 若還沒今日檔,TPEX 當日列會是空的(RS 會 ffill 成昨日收盤;型態偵測沿用上一根)。除權息當日,TWSE 未還原收盤與 Yahoo 還原歷史拼在同一序列,單日報酬可能有落差。
 
 平日若 Yahoo 與 TWSE 都還沒有今日檔,程式以 exit 2 結束、**不 commit 舊資料**,等下一個時段。Yahoo 已是今天時,即使抽樣價與 TWSE 差 >3% 也不再擋下(避免還原價誤殺)。
 
