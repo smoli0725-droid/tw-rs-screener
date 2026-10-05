@@ -15,6 +15,7 @@ from rs_calculator import (
     TAIPEI_TZ,
     apply_twse_snapshot,
     check_freshness,
+    drop_incomplete_tail,
     fetch_neo_day_all,
     _parse_twse_date,
     _twse_snapshot_date,
@@ -181,9 +182,62 @@ def test_check_freshness_delayed_cron_after_midnight(monkeypatch):
     twii = pd.Series([46500.0, 47300.0], index=dates)
     twse = _twse_day_all("1150907", {"2330": "2460.00"})
     monkeypatch.setattr("rs_calculator.fetch_twse_day_all", lambda: twse)
-    r = check_freshness(close, twii, today=today, now=now, skip=False, twse=twse)
+    r = check_freshness(close, twii, today=today, now=now, skip=False, twse=twse,
+                        prev_session=dt.date(2026, 9, 7))
     assert r["is_fresh"] is True
     assert r["twse_cross_check"]["reason"] == "before_session_close"
+
+
+def test_check_freshness_after_midnight_requires_previous_session(monkeypatch):
+    """2026-10-06 00:35:Yahoo 只到 10/2,不可把 10/2 當成 10/5 收盤寫出去。"""
+    today = dt.date(2026, 10, 6)
+    now = dt.datetime(2026, 10, 6, 0, 35, tzinfo=TAIPEI_TZ)
+    dates = _dates(2, end=dt.date(2026, 10, 2))
+    close = pd.DataFrame({"2330.TW": [2510.0, 2500.0]}, index=dates)
+    twii = pd.Series([48353.0, 48475.0], index=dates)
+    twse = _twse_day_all("1151002", {"2330": "2500.00"})
+    monkeypatch.setattr("rs_calculator.fetch_twse_day_all", lambda: twse)
+    r = check_freshness(close, twii, today=today, now=now, skip=False, twse=twse,
+                        prev_session=dt.date(2026, 10, 5))
+    assert r["is_fresh"] is False
+    assert r["twse_cross_check"]["reason"] == "prev_session_missing"
+
+
+def test_drop_incomplete_tail_removes_volume_only_yahoo_row():
+    """Yahoo 給了 10/5 列但只有成交量:剔除後資料日期回到 10/2。"""
+    ohlcv, close, volume, twii = _market(dt.date(2026, 10, 5), n=4)
+    for key in ("Open", "High", "Low", "Close"):
+        ohlcv[key].iloc[-1] = np.nan
+    twii.iloc[-1] = np.nan
+    o2, c2, v2, t2, dropped = drop_incomplete_tail(
+        ohlcv, ohlcv["Close"], ohlcv["Volume"], twii)
+    assert dropped == [dt.date(2026, 10, 5)]
+    assert pd.Timestamp(c2.index[-1]).date() == dt.date(2026, 10, 2)
+    assert pd.Timestamp(o2["Volume"].index[-1]).date() == dt.date(2026, 10, 2)
+    assert pd.Timestamp(t2.index[-1]).date() == dt.date(2026, 10, 2)
+    # 完整的資料不動
+    o3, c3, v3, t3, dropped = drop_incomplete_tail(o2, c2, v2, t2)
+    assert dropped == []
+    assert len(c3) == len(c2)
+
+
+def test_apply_twse_catches_up_missed_session_after_midnight():
+    """午夜後:Yahoo 只到 10/2、TWSE 快照 10/5 → 補上 10/5 上市收盤。"""
+    today = dt.date(2026, 10, 6)
+    ohlcv, close, volume, twii = _market(dt.date(2026, 10, 2), n=3)
+    twse = _twse_day_all("1151005", {"2330": "2550.00", "2317": "265.00"})
+    o2, c2, v2, t2, meta = apply_twse_snapshot(
+        ohlcv, close, volume, twii, twse, today=today, taiex_close=48600.0)
+    assert meta["applied"] is True
+    assert meta["appended_row"] is True
+    assert pd.Timestamp(c2.index[-1]).date() == dt.date(2026, 10, 5)
+    assert float(c2["2330.TW"].iloc[-1]) == 2550.0
+    assert float(t2.iloc[-1]) == 48600.0
+    r = check_freshness(c2, t2, today=today, now=dt.datetime(2026, 10, 6, 0, 35, tzinfo=TAIPEI_TZ),
+                        skip=False, twse=twse, overlay=meta,
+                        prev_session=dt.date(2026, 10, 5))
+    assert r["is_fresh"] is True
+    assert r["data_date"] == "2026-10-05"
 
 
 def test_check_freshness_does_not_compare_mismatched_dates(monkeypatch):

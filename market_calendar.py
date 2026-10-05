@@ -232,6 +232,30 @@ def is_market_closed(today: dt.date | None = None) -> tuple[bool, str]:
     return False, ""
 
 
+def previous_session(today: dt.date | None = None,
+                     closures: dict[dt.date, str] | None = None) -> dt.date:
+    """today 之前最近的一個交易日（排除週末與休市表）。
+
+    午夜後延遲的排程用它確認「上一交易日」的收盤已經進來。
+    不看新聞標題：臨時休市漏判只會讓這次等下一個時段，不會寫入舊資料。
+    """
+    today = today or taipei_today()
+    cache: dict[int, dict[dt.date, str]] = {}
+    d = today - dt.timedelta(days=1)
+    for _ in range(30):
+        if d.weekday() < 5:
+            if closures is not None:
+                table = closures
+            else:
+                if d.year not in cache:
+                    cache[d.year] = closures_for_year(d.year)
+                table = cache[d.year]
+            if d not in table:
+                return d
+        d -= dt.timedelta(days=1)
+    return d
+
+
 def skip_message(today: dt.date) -> str:
     return f"今天({today.isoformat()})休市，略過"
 
