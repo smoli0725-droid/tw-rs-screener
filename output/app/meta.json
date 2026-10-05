@@ -1,19 +1,19 @@
 {
   "data_date": "2026-10-05",
-  "generated_at": "2026-10-06T05:04:26.851086+08:00",
+  "generated_at": "2026-10-06T05:21:37.529285+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-10-06T05:04:16.284963+08:00",
-  "message": "今日盤未收(台北 05:04),沿用 2026-10-05",
+  "source_checked_at": "2026-10-06T05:21:31.079061+08:00",
+  "message": "今日盤未收(台北 05:21),沿用 2026-10-05",
   "twse_cross_check": {
     "ok": true,
     "reason": "before_session_close",
-    "twse_date": "2026-10-02"
+    "twse_date": "2026-10-05"
   },
   "price_overlay": {
     "applied": false,
     "source": null,
-    "twse_date": "2026-10-02",
+    "twse_date": "2026-10-05",
     "yahoo_date": "2026-10-05",
     "listed_filled": 0,
     "appended_row": false,
