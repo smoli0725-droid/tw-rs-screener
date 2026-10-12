@@ -1585,8 +1585,8 @@
    "outcome_pct": -5.59,
    "peak_close": 29.9,
    "trough_close": 27.0,
-   "last_date": "2026-10-12",
-   "last_close": 27.05
+   "last_date": "2026-10-08",
+   "last_close": 27.15
   },
   {
    "trade_id": "3624-2026-09-18-126",
@@ -2827,8 +2827,8 @@
    "outcome_pct": -6.45,
    "peak_close": 25.85,
    "trough_close": 23.95,
-   "last_date": "2026-10-12",
-   "last_close": 23.0
+   "last_date": "2026-10-08",
+   "last_close": 23.95
   },
   {
    "trade_id": "6016-2026-09-30-24.25",
@@ -3701,8 +3701,8 @@
    "outcome_pct": -6.66,
    "peak_close": 451.5,
    "trough_close": 406.5,
-   "last_date": "2026-10-12",
-   "last_close": 411.0
+   "last_date": "2026-10-08",
+   "last_close": 403.5
   },
   {
    "trade_id": "8358-2026-10-05-521",
@@ -3747,8 +3747,8 @@
    "outcome_pct": -7.47,
    "peak_close": 140.5,
    "trough_close": 130.0,
-   "last_date": "2026-10-12",
-   "last_close": 120.5
+   "last_date": "2026-10-08",
+   "last_close": 130.0
   },
   {
    "trade_id": "6944-2026-10-06-820",
@@ -3862,8 +3862,8 @@
    "outcome_pct": -9.58,
    "peak_close": 372.0,
    "trough_close": 335.0,
-   "last_date": "2026-10-12",
-   "last_close": 307.5
+   "last_date": "2026-10-08",
+   "last_close": 335.0
   },
   {
    "trade_id": "2305-2026-10-08-63.6",
