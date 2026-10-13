@@ -4291,10 +4291,10 @@
   },
   {
    "date": "2026-10-13",
-   "wins": 58,
-   "losses": 19,
+   "wins": 61,
+   "losses": 18,
    "pending": 46,
-   "win_rate": 0.753,
+   "win_rate": 0.772,
    "label": "市況良好"
   }
  ],
@@ -4302,12 +4302,12 @@
  "market": {
   "as_of": "2026-10-13",
   "window_days": 10,
-  "window_start": "2026-09-29",
-  "wins": 58,
-  "losses": 19,
+  "window_start": "2026-09-24",
+  "wins": 61,
+  "losses": 18,
   "pending": 46,
   "recovered": 3,
-  "win_rate": 0.753,
+  "win_rate": 0.772,
   "label": "市況良好",
   "rules": {
    "buy_zone_pct": 5.0,
