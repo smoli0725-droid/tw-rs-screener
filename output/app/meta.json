@@ -1,26 +1,24 @@
 {
   "data_date": "2026-10-28",
-  "generated_at": "2026-10-28T17:21:50.160942+08:00",
+  "generated_at": "2026-10-29T00:18:06.146525+08:00",
   "is_fresh": true,
-  "is_trading_day": true,
-  "source_checked_at": "2026-10-28T17:21:36.687864+08:00",
-  "message": "fresh（TWSE 快照 2026-10-27 尚未更新,略過交叉比價）",
+  "is_trading_day": false,
+  "source_checked_at": "2026-10-29T00:17:51.269923+08:00",
+  "message": "今日盤未收(台北 00:17),沿用 2026-10-28",
   "twse_cross_check": {
     "ok": true,
-    "skipped": true,
-    "reason": "twse_stale",
-    "twse_date": "2026-10-27",
-    "mismatches": []
+    "reason": "before_session_close",
+    "twse_date": "2026-10-28"
   },
   "price_overlay": {
-    "applied": false,
-    "source": null,
-    "twse_date": "2026-10-27",
-    "yahoo_date": "2026-10-28",
-    "listed_filled": 0,
-    "appended_row": false,
-    "taiex_filled": false,
-    "message": "twse_not_today",
+    "applied": true,
+    "source": "twse",
+    "twse_date": "2026-10-28",
+    "yahoo_date": "2026-10-27",
+    "listed_filled": 1074,
+    "appended_row": true,
+    "taiex_filled": true,
+    "message": "appended",
     "tpex_date": "2026-10-28",
     "otc_filled": 871
   },
@@ -31,7 +29,7 @@
     "near_breakout": 22,
     "broke_out": 9,
     "ohlcv_symbols": 168,
-    "universe": 1966
+    "universe": 1965
   },
   "market": {
     "as_of": "2026-10-28",
