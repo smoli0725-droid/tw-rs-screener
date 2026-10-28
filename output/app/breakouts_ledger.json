@@ -4809,6 +4809,29 @@
    "last_close": 279.5
   },
   {
+   "trade_id": "5351-2026-10-28-106.5",
+   "id": "5351",
+   "name": "鈺創",
+   "market": "上櫃",
+   "pattern": "作弊型態",
+   "pattern_label": "作弊型態",
+   "yf_ticker": "5351.TWO",
+   "rs": 95,
+   "pivot": 106.5,
+   "breakout_date": "2026-10-28",
+   "breakout_close": 114.0,
+   "origin": "pattern",
+   "status": "active",
+   "outcome": null,
+   "outcome_date": null,
+   "outcome_close": null,
+   "outcome_pct": null,
+   "peak_close": 114.0,
+   "trough_close": 114.0,
+   "last_date": "2026-10-28",
+   "last_close": 114.0
+  },
+  {
    "trade_id": "5434-2026-10-28-547",
    "id": "5434",
    "name": "崇越",
@@ -5178,7 +5201,7 @@
    "date": "2026-10-28",
    "wins": 17,
    "losses": 34,
-   "pending": 27,
+   "pending": 28,
    "win_rate": 0.333,
    "label": "市況不佳"
   }
@@ -5190,7 +5213,7 @@
   "window_start": "2026-10-14",
   "wins": 17,
   "losses": 34,
-  "pending": 27,
+  "pending": 28,
   "recovered": 17,
   "win_rate": 0.333,
   "label": "市況不佳",
