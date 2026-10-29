@@ -642,8 +642,8 @@
    "outcome_pct": -6.9,
    "peak_close": 89.2,
    "trough_close": 75.6,
-   "last_date": "2026-10-28",
-   "last_close": 72.7
+   "last_date": "2026-10-29",
+   "last_close": 70.6
   },
   {
    "trade_id": "6924-2026-09-04-119.5",
@@ -1355,8 +1355,8 @@
    "outcome_pct": -5.56,
    "peak_close": 315.0,
    "trough_close": 297.5,
-   "last_date": "2026-10-28",
-   "last_close": 289.5
+   "last_date": "2026-10-29",
+   "last_close": 298.0
   },
   {
    "trade_id": "6538-2026-09-16-372.5",
@@ -2176,15 +2176,15 @@
    "breakout_date": "2026-09-24",
    "breakout_close": 52.7,
    "origin": "pattern",
-   "status": "failed",
+   "status": "recovered",
    "outcome": "failed",
    "outcome_date": "2026-10-22",
    "outcome_close": 49.4,
    "outcome_pct": -5.36,
    "peak_close": 52.7,
    "trough_close": 49.4,
-   "last_date": "2026-10-28",
-   "last_close": 49.5
+   "last_date": "2026-10-29",
+   "last_close": 49.85
   },
   {
    "trade_id": "6944-2026-09-24-738",
@@ -2436,8 +2436,8 @@
    "outcome_pct": -8.3,
    "peak_close": 47.1,
    "trough_close": 41.45,
-   "last_date": "2026-10-28",
-   "last_close": 37.3
+   "last_date": "2026-10-29",
+   "last_close": 35.5
   },
   {
    "trade_id": "6187-2026-09-29-1270",
@@ -2827,8 +2827,8 @@
    "outcome_pct": -6.45,
    "peak_close": 25.85,
    "trough_close": 23.95,
-   "last_date": "2026-10-28",
-   "last_close": 21.8
+   "last_date": "2026-10-29",
+   "last_close": 21.1
   },
   {
    "trade_id": "6016-2026-09-30-24.25",
@@ -2850,8 +2850,8 @@
    "outcome_pct": -6.8,
    "peak_close": 24.35,
    "trough_close": 22.6,
-   "last_date": "2026-10-28",
-   "last_close": 22.4
+   "last_date": "2026-10-29",
+   "last_close": 22.25
   },
   {
    "trade_id": "6108-2026-09-30-24.65",
@@ -3027,15 +3027,15 @@
    "breakout_date": "2026-10-01",
    "breakout_close": 97.5,
    "origin": "pattern",
-   "status": "recovered",
+   "status": "failed",
    "outcome": "failed",
    "outcome_date": "2026-10-19",
    "outcome_close": 91.4,
    "outcome_pct": -5.77,
    "peak_close": 105.5,
    "trough_close": 91.4,
-   "last_date": "2026-10-28",
-   "last_close": 92.3
+   "last_date": "2026-10-29",
+   "last_close": 89.8
   },
   {
    "trade_id": "6174-2026-10-01-46.55",
@@ -3103,8 +3103,8 @@
    "outcome_pct": -5.91,
    "peak_close": 48.0,
    "trough_close": 43.0,
-   "last_date": "2026-10-28",
-   "last_close": 39.65
+   "last_date": "2026-10-29",
+   "last_close": 39.2
   },
   {
    "trade_id": "6259-2026-10-01-30.35",
@@ -3264,8 +3264,8 @@
    "outcome_pct": -9.23,
    "peak_close": 310.5,
    "trough_close": 270.5,
-   "last_date": "2026-10-28",
-   "last_close": 272.5
+   "last_date": "2026-10-29",
+   "last_close": 270.5
   },
   {
    "trade_id": "6271-2026-10-02-234",
@@ -3287,8 +3287,8 @@
    "outcome_pct": -6.41,
    "peak_close": 247.5,
    "trough_close": 219.0,
-   "last_date": "2026-10-28",
-   "last_close": 214.5
+   "last_date": "2026-10-29",
+   "last_close": 206.0
   },
   {
    "trade_id": "6531-2026-10-02-995",
@@ -3310,8 +3310,8 @@
    "outcome_pct": -6.93,
    "peak_close": 1055.0,
    "trough_close": 926.0,
-   "last_date": "2026-10-28",
-   "last_close": 843.0
+   "last_date": "2026-10-29",
+   "last_close": 841.0
   },
   {
    "trade_id": "6548-2026-10-02-75.5",
@@ -3402,8 +3402,8 @@
    "outcome_pct": -5.61,
    "peak_close": 240.0,
    "trough_close": 210.5,
-   "last_date": "2026-10-28",
-   "last_close": 205.5
+   "last_date": "2026-10-29",
+   "last_close": 202.0
   },
   {
    "trade_id": "2301-2026-10-05-288.5",
@@ -3625,15 +3625,15 @@
    "breakout_date": "2026-10-05",
    "breakout_close": 249.5,
    "origin": "pattern",
-   "status": "recovered",
+   "status": "failed",
    "outcome": "failed",
    "outcome_date": "2026-10-27",
    "outcome_close": 228.0,
    "outcome_pct": -5.2,
    "peak_close": 263.5,
    "trough_close": 228.0,
-   "last_date": "2026-10-28",
-   "last_close": 236.5
+   "last_date": "2026-10-29",
+   "last_close": 227.5
   },
   {
    "trade_id": "6419-2026-10-05-157.5",
@@ -3770,8 +3770,8 @@
    "outcome_pct": -7.47,
    "peak_close": 140.5,
    "trough_close": 130.0,
-   "last_date": "2026-10-28",
-   "last_close": 107.5
+   "last_date": "2026-10-29",
+   "last_close": 104.5
   },
   {
    "trade_id": "6944-2026-10-06-820",
@@ -4108,15 +4108,15 @@
    "breakout_date": "2026-10-12",
    "breakout_close": 69.3,
    "origin": "pattern",
-   "status": "recovered",
+   "status": "failed",
    "outcome": "failed",
    "outcome_date": "2026-10-29",
    "outcome_close": 63.2,
    "outcome_pct": -6.65,
    "peak_close": 69.3,
    "trough_close": 63.2,
-   "last_date": "2026-10-28",
-   "last_close": 65.2
+   "last_date": "2026-10-29",
+   "last_close": 63.2
   },
   {
    "trade_id": "6924-2026-10-12-137",
@@ -4476,15 +4476,15 @@
    "breakout_date": "2026-10-21",
    "breakout_close": 823.0,
    "origin": "recovered",
-   "status": "recovered",
+   "status": "failed",
    "outcome": "failed",
    "outcome_date": "2026-10-27",
    "outcome_close": 746.0,
    "outcome_pct": -8.13,
    "peak_close": 823.0,
    "trough_close": 746.0,
-   "last_date": "2026-10-28",
-   "last_close": 778.0
+   "last_date": "2026-10-29",
+   "last_close": 745.0
   },
   {
    "trade_id": "6491-2026-10-21-424",
@@ -5222,7 +5222,7 @@
   "wins": 11,
   "losses": 36,
   "pending": 26,
-  "recovered": 7,
+  "recovered": 4,
   "win_rate": 0.234,
   "label": "市況不佳",
   "rules": {
