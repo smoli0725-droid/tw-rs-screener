@@ -1,45 +1,45 @@
 {
-  "data_date": "2026-11-03",
-  "generated_at": "2026-11-04T04:18:10.729207+08:00",
+  "data_date": "2026-11-04",
+  "generated_at": "2026-11-05T01:30:04.501176+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-11-04T04:18:01.920887+08:00",
-  "message": "今日盤未收(台北 04:18),沿用 2026-11-03",
+  "source_checked_at": "2026-11-05T01:29:54.744262+08:00",
+  "message": "今日盤未收(台北 01:29),沿用 2026-11-04",
   "twse_cross_check": {
     "ok": true,
     "reason": "before_session_close",
-    "twse_date": "2026-11-03"
+    "twse_date": "2026-11-04"
   },
   "price_overlay": {
     "applied": true,
     "source": "twse",
-    "twse_date": "2026-11-03",
-    "yahoo_date": "2026-11-02",
-    "listed_filled": 1071,
+    "twse_date": "2026-11-04",
+    "yahoo_date": "2026-11-03",
+    "listed_filled": 1077,
     "appended_row": true,
     "taiex_filled": true,
     "message": "appended",
-    "tpex_date": "2026-11-03",
-    "otc_filled": 872
+    "tpex_date": "2026-11-04",
+    "otc_filled": 880
   },
   "counts": {
-    "rs85": 292,
+    "rs85": 291,
     "patterns": 23,
     "pattern_symbols": 23,
     "near_breakout": 9,
-    "broke_out": 2,
-    "ohlcv_symbols": 175,
-    "universe": 1967
+    "broke_out": 3,
+    "ohlcv_symbols": 177,
+    "universe": 1966
   },
   "market": {
-    "as_of": "2026-11-03",
+    "as_of": "2026-11-04",
     "window_days": 10,
-    "window_start": "2026-10-20",
+    "window_start": "2026-10-21",
     "wins": 10,
-    "losses": 28,
-    "pending": 15,
+    "losses": 30,
+    "pending": 11,
     "recovered": 1,
-    "win_rate": 0.263,
+    "win_rate": 0.25,
     "label": "市況不佳",
     "rules": {
       "buy_zone_pct": 5.0,
