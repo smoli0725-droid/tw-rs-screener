@@ -1,10 +1,10 @@
 {
   "data_date": "2026-11-12",
-  "generated_at": "2026-11-13T01:45:18.708038+08:00",
+  "generated_at": "2026-11-13T01:52:53.374846+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-11-13T01:45:06.746987+08:00",
-  "message": "今日盤未收(台北 01:45),沿用 2026-11-12",
+  "source_checked_at": "2026-11-13T01:52:44.872871+08:00",
+  "message": "今日盤未收(台北 01:52),沿用 2026-11-12",
   "twse_cross_check": {
     "ok": true,
     "reason": "before_session_close",
