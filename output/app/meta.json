@@ -1,10 +1,10 @@
 {
   "data_date": "2026-11-12",
-  "generated_at": "2026-11-13T03:32:55.058841+08:00",
+  "generated_at": "2026-11-13T04:15:26.390587+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-11-13T03:32:46.161835+08:00",
-  "message": "今日盤未收(台北 03:32),沿用 2026-11-12",
+  "source_checked_at": "2026-11-13T04:15:20.536810+08:00",
+  "message": "今日盤未收(台北 04:15),沿用 2026-11-12",
   "twse_cross_check": {
     "ok": true,
     "reason": "before_session_close",
@@ -29,7 +29,7 @@
     "near_breakout": 3,
     "broke_out": 2,
     "ohlcv_symbols": 190,
-    "universe": 1965
+    "universe": 1966
   },
   "market": {
     "as_of": "2026-11-12",
