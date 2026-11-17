@@ -1,10 +1,10 @@
 {
   "data_date": "2026-11-17",
-  "generated_at": "2026-11-18T04:27:11.806925+08:00",
+  "generated_at": "2026-11-18T05:10:08.334000+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-11-18T04:27:02.954297+08:00",
-  "message": "今日盤未收(台北 04:27),沿用 2026-11-17",
+  "source_checked_at": "2026-11-18T05:10:01.248539+08:00",
+  "message": "今日盤未收(台北 05:10),沿用 2026-11-17",
   "twse_cross_check": {
     "ok": true,
     "reason": "before_session_close",
@@ -23,13 +23,13 @@
     "otc_filled": 866
   },
   "counts": {
-    "rs85": 292,
+    "rs85": 291,
     "patterns": 35,
     "pattern_symbols": 35,
     "near_breakout": 2,
     "broke_out": 2,
     "ohlcv_symbols": 200,
-    "universe": 1967
+    "universe": 1966
   },
   "market": {
     "as_of": "2026-11-17",
