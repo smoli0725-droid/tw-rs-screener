@@ -43,6 +43,93 @@ void main() {
       expect(positions.first.returnPct, closeTo(160 / 110 - 1, 1e-6));
     });
 
+    test('sell dated before the buy matches no shares and leaves the position open', () {
+      final buy = Trade(
+        symbol: '2330',
+        name: '台積電',
+        market: '上市',
+        side: TradeSide.buy,
+        date: DateTime(2026, 9, 10),
+        price: 100,
+        shares: 100,
+      );
+      final candidate = Trade(
+        symbol: '2330',
+        name: '台積電',
+        market: '上市',
+        side: TradeSide.sell,
+        date: DateTime(2026, 9, 1),
+        price: 110,
+        shares: 100,
+      );
+      expect(matchedSellShares([buy], candidate), 0);
+      final trades = [buy, candidate];
+      final positions = buildPositions(trades);
+      expect(positions, hasLength(1));
+      expect(positions.first.symbol, '2330');
+      expect(positions.first.shares, 100);
+      expect(buildClosedTrades(trades), hasLength(0));
+    });
+
+    test('same-day sell closes the shares bought that day', () {
+      final buy = Trade(
+        symbol: '2330',
+        name: '台積電',
+        market: '上市',
+        side: TradeSide.buy,
+        date: DateTime(2026, 9, 10, 18),
+        price: 100,
+        shares: 100,
+      );
+      final candidate = Trade(
+        symbol: '2330',
+        name: '台積電',
+        market: '上市',
+        side: TradeSide.sell,
+        date: DateTime(2026, 9, 10, 9),
+        price: 110,
+        shares: 100,
+      );
+      expect(matchedSellShares([buy], candidate), 100);
+      final trades = [candidate, buy];
+      final positions = buildPositions(trades);
+      expect(positions, isEmpty);
+      expect(buildClosedTrades(trades), hasLength(1));
+    });
+
+    test('sell between two buys matches only the shares already owned', () {
+      final trades = [
+        Trade(
+          symbol: '2330',
+          name: '台積電',
+          market: '上市',
+          side: TradeSide.buy,
+          date: DateTime(2026, 9, 1),
+          price: 100,
+          shares: 50,
+        ),
+        Trade(
+          symbol: '2330',
+          name: '台積電',
+          market: '上市',
+          side: TradeSide.buy,
+          date: DateTime(2026, 9, 10),
+          price: 100,
+          shares: 50,
+        ),
+      ];
+      final candidate = Trade(
+        symbol: '2330',
+        name: '台積電',
+        market: '上市',
+        side: TradeSide.sell,
+        date: DateTime(2026, 9, 5),
+        price: 110,
+        shares: 100,
+      );
+      expect(matchedSellShares(trades, candidate), 50);
+    });
+
     test('FIFO closed trades', () {
       final trades = [
         Trade(
