@@ -1,0 +1,4 @@
+{
+  "name": "Taiwan RS Screener",
+  "install": "pip install --user -r requirements.txt"
+}
