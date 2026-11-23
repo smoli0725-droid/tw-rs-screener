@@ -1,26 +1,26 @@
 {
   "data_date": "2026-11-23",
-  "generated_at": "2026-11-24T05:39:45.590603+08:00",
+  "generated_at": "2026-11-24T05:53:24.124319+08:00",
   "is_fresh": true,
   "is_trading_day": false,
-  "source_checked_at": "2026-11-24T05:39:37.191165+08:00",
-  "message": "今日盤未收(台北 05:39),沿用 2026-11-23",
+  "source_checked_at": "2026-11-24T05:53:13.480195+08:00",
+  "message": "今日盤未收(台北 05:53),沿用 2026-11-23",
   "twse_cross_check": {
     "ok": true,
     "reason": "before_session_close",
     "twse_date": "2026-11-23"
   },
   "price_overlay": {
-    "applied": true,
-    "source": "twse",
+    "applied": false,
+    "source": null,
     "twse_date": "2026-11-23",
-    "yahoo_date": "2026-11-20",
-    "listed_filled": 1076,
-    "appended_row": true,
-    "taiex_filled": true,
-    "message": "appended",
+    "yahoo_date": "2026-11-23",
+    "listed_filled": 0,
+    "appended_row": false,
+    "taiex_filled": false,
+    "message": "twse_not_today",
     "tpex_date": "2026-11-23",
-    "otc_filled": 872
+    "otc_filled": 0
   },
   "counts": {
     "rs85": 291,
